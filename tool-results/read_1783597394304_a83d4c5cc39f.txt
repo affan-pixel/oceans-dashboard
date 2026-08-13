@@ -1,0 +1,798 @@
+     1→'use client'
+     2→
+     3→import { useState } from 'react'
+     4→import {
+     5→  Users,
+     6→  Plus,
+     7→  Loader2,
+     8→  Trash2,
+     9→  Pencil,
+    10→  Sparkles,
+    11→  Search,
+    12→  Mail,
+    13→  Phone,
+    14→  Linkedin,
+    15→  Github,
+    16→} from 'lucide-react'
+    17→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+    18→import { Button } from '@/components/ui/button'
+    19→import { Badge } from '@/components/ui/badge'
+    20→import { Input } from '@/components/ui/input'
+    21→import { Label } from '@/components/ui/label'
+    22→import { Textarea } from '@/components/ui/textarea'
+    23→import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+    24→import {
+    25→  Sheet,
+    26→  SheetContent,
+    27→  SheetHeader,
+    28→  SheetTitle,
+    29→  SheetDescription,
+    30→} from '@/components/ui/sheet'
+    31→import {
+    32→  Dialog,
+    33→  DialogContent,
+    34→  DialogHeader,
+    35→  DialogTitle,
+    36→  DialogFooter,
+    37→} from '@/components/ui/dialog'
+    38→import {
+    39→  AlertDialog,
+    40→  AlertDialogAction,
+    41→  AlertDialogCancel,
+    42→  AlertDialogContent,
+    43→  AlertDialogDescription,
+    44→  AlertDialogFooter,
+    45→  AlertDialogHeader,
+    46→  AlertDialogTitle,
+    47→  AlertDialogTrigger,
+    48→} from '@/components/ui/alert-dialog'
+    49→import { ScrollArea } from '@/components/ui/scroll-area'
+    50→import { Separator } from '@/components/ui/separator'
+    51→import { Skeleton } from '@/components/ui/skeleton'
+    52→import {
+    53→  useCandidates,
+    54→  useCreateCandidate,
+    55→  useUpdateCandidate,
+    56→  useDeleteCandidate,
+    57→  useRestructureCandidate,
+    58→} from '../hooks/use-ocean-query'
+    59→import { CandidateStatusBadge } from '../ui/signal-badge'
+    60→import { initials, SAMPLE_CV, relativeTime } from '../hooks/utils'
+    61→import type { CandidateDTO } from '@/lib/types'
+    62→
+    63→function AddCandidateDialog() {
+    64→  const create = useCreateCandidate()
+    65→  const [open, setOpen] = useState(false)
+    66→  const [form, setForm] = useState({
+    67→    name: '',
+    68→    headline: '',
+    69→    location: '',
+    70→    email: '',
+    71→    phone: '',
+    72→    linkedinUrl: '',
+    73→    githubUrl: '',
+    74→    rawProfile: '',
+    75→    tags: '',
+    76→  })
+    77→
+    78→  function reset() {
+    79→    setForm({
+    80→      name: '',
+    81→      headline: '',
+    82→      location: '',
+    83→      email: '',
+    84→      phone: '',
+    85→      linkedinUrl: '',
+    86→      githubUrl: '',
+    87→      rawProfile: '',
+    88→      tags: '',
+    89→    })
+    90→  }
+    91→
+    92→  function loadSample() {
+    93→    setForm((f) => ({
+    94→      ...f,
+    95→      name: 'Kasun Perera',
+    96→      headline: 'GTM / Outbound Operator',
+    97→      location: 'Colombo, Sri Lanka',
+    98→      rawProfile: SAMPLE_CV,
+    99→      tags: 'gtm, outbound, apollo, lemlist',
+   100→    }))
+   101→  }
+   102→
+   103→  function submit() {
+   104→    if (!form.name.trim() || !form.headline.trim() || !form.location.trim() || !form.rawProfile.trim()) {
+   105→      return
+   106→    }
+   107→    create.mutate(
+   108→      {
+   109→        name: form.name,
+   110→        headline: form.headline,
+   111→        location: form.location,
+   112→        email: form.email || null,
+   113→        phone: form.phone || null,
+   114→        linkedinUrl: form.linkedinUrl || null,
+   115→        githubUrl: form.githubUrl || null,
+   116→        rawProfile: form.rawProfile,
+   117→        tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
+   118→      },
+   119→      {
+   120→        onSettled: () => {
+   121→          setOpen(false)
+   122→          reset()
+   123→        },
+   124→      }
+   125→    )
+   126→  }
+   127→
+   128→  return (
+   129→    <Dialog open={open} onOpenChange={setOpen}>
+   130→      <Button onClick={() => setOpen(true)} size="sm">
+   131→        <Plus className="size-4" />
+   132→        Add Candidate
+   133→      </Button>
+   134→      <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-y-auto ocean-scroll">
+   135→        <DialogHeader>
+   136→          <DialogTitle>Add a candidate</DialogTitle>
+   137→        </DialogHeader>
+   138→        <div className="grid sm:grid-cols-2 gap-3">
+   139→          <div className="space-y-1.5">
+   140→            <Label htmlFor="c-name">Name *</Label>
+   141→            <Input
+   142→              id="c-name"
+   143→              value={form.name}
+   144→              onChange={(e) => setForm({ ...form, name: e.target.value })}
+   145→            />
+   146→          </div>
+   147→          <div className="space-y-1.5">
+   148→            <Label htmlFor="c-headline">Headline *</Label>
+   149→            <Input
+   150→              id="c-headline"
+   151→              value={form.headline}
+   152→              onChange={(e) => setForm({ ...form, headline: e.target.value })}
+   153→              placeholder="e.g. GTM Operator"
+   154→            />
+   155→          </div>
+   156→          <div className="space-y-1.5">
+   157→            <Label htmlFor="c-loc">Location *</Label>
+   158→            <Input
+   159→              id="c-loc"
+   160→              value={form.location}
+   161→              onChange={(e) => setForm({ ...form, location: e.target.value })}
+   162→              placeholder="e.g. Colombo, Sri Lanka"
+   163→            />
+   164→          </div>
+   165→          <div className="space-y-1.5">
+   166→            <Label htmlFor="c-email">Email</Label>
+   167→            <Input
+   168→              id="c-email"
+   169→              type="email"
+   170→              value={form.email}
+   171→              onChange={(e) => setForm({ ...form, email: e.target.value })}
+   172→            />
+   173→          </div>
+   174→          <div className="space-y-1.5">
+   175→            <Label htmlFor="c-phone">Phone</Label>
+   176→            <Input
+   177→              id="c-phone"
+   178→              value={form.phone}
+   179→              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+   180→            />
+   181→          </div>
+   182→          <div className="space-y-1.5">
+   183→            <Label htmlFor="c-li">LinkedIn URL</Label>
+   184→            <Input
+   185→              id="c-li"
+   186→              value={form.linkedinUrl}
+   187→              onChange={(e) => setForm({ ...form, linkedinUrl: e.target.value })}
+   188→            />
+   189→          </div>
+   190→          <div className="space-y-1.5">
+   191→            <Label htmlFor="c-gh">GitHub URL</Label>
+   192→            <Input
+   193→              id="c-gh"
+   194→              value={form.githubUrl}
+   195→              onChange={(e) => setForm({ ...form, githubUrl: e.target.value })}
+   196→            />
+   197→          </div>
+   198→          <div className="space-y-1.5">
+   199→            <Label htmlFor="c-tags">Tags (comma-separated)</Label>
+   200→            <Input
+   201→              id="c-tags"
+   202→              value={form.tags}
+   203→              onChange={(e) => setForm({ ...form, tags: e.target.value })}
+   204→              placeholder="gtm, outbound, saas"
+   205→            />
+   206→          </div>
+   207→          <div className="space-y-1.5 sm:col-span-2">
+   208→            <div className="flex items-center justify-between">
+   209→              <Label htmlFor="c-raw">Raw profile / CV *</Label>
+   210→              <Button variant="ghost" size="sm" onClick={loadSample}>
+   211→                <Sparkles className="size-4" />
+   212→                Load sample
+   213→              </Button>
+   214→            </div>
+   215→            <Textarea
+   216→              id="c-raw"
+   217→              rows={10}
+   218→              value={form.rawProfile}
+   219→              onChange={(e) => setForm({ ...form, rawProfile: e.target.value })}
+   220→              placeholder="Paste the candidate's CV, LinkedIn about, or raw profile text…"
+   221→              className="font-mono text-xs"
+   222→            />
+   223→          </div>
+   224→        </div>
+   225→
+   226→        {create.isPending && (
+   227→          <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5 flex items-center gap-2.5">
+   228→            <Loader2 className="size-4 animate-spin text-primary" />
+   229→            <p className="text-xs text-muted-foreground">
+   230→              AI is structuring the profile into outcomes, tools, stages, and roles-fit…
+   231→            </p>
+   232→          </div>
+   233→        )}
+   234→
+   235→        <DialogFooter>
+   236→          <Button
+   237→            onClick={submit}
+   238→            disabled={
+   239→              create.isPending ||
+   240→              !form.name.trim() ||
+   241→              !form.headline.trim() ||
+   242→              !form.location.trim() ||
+   243→              !form.rawProfile.trim()
+   244→            }
+   245→          >
+   246→            {create.isPending ? (
+   247→              <Loader2 className="size-4 animate-spin" />
+   248→            ) : (
+   249→              <Sparkles className="size-4" />
+   250→            )}
+   251→            {create.isPending ? 'Structuring…' : 'Create candidate'}
+   252→          </Button>
+   253→        </DialogFooter>
+   254→      </DialogContent>
+   255→    </Dialog>
+   256→  )
+   257→}
+   258→
+   259→function CandidateCard({
+   260→  candidate,
+   261→  onOpen,
+   262→}: {
+   263→  candidate: CandidateDTO
+   264→  onOpen: (id: string) => void
+   265→}) {
+   266→  return (
+   267→    <Card
+   268→      role="button"
+   269→      tabIndex={0}
+   270→      onClick={() => onOpen(candidate.id)}
+   271→      onKeyDown={(e) => {
+   272→        if (e.key === 'Enter' || e.key === ' ') {
+   273→          e.preventDefault()
+   274→          onOpen(candidate.id)
+   275→        }
+   276→      }}
+   277→      className="cursor-pointer hover:border-primary/40 hover:shadow-md transition-all py-4"
+   278→    >
+   279→      <CardContent className="px-4 space-y-3">
+   280→        <div className="flex items-start gap-3">
+   281→          <Avatar className="size-10">
+   282→            <AvatarFallback className="bg-primary/10 text-primary font-medium">
+   283→              {initials(candidate.name)}
+   284→            </AvatarFallback>
+   285→          </Avatar>
+   286→          <div className="flex-1 min-w-0">
+   287→            <div className="font-medium truncate">{candidate.name}</div>
+   288→            <div className="text-xs text-muted-foreground truncate">{candidate.headline}</div>
+   289→            <div className="text-[11px] text-muted-foreground truncate">{candidate.location}</div>
+   290→          </div>
+   291→          <CandidateStatusBadge status={candidate.status} />
+   292→        </div>
+   293→
+   294→        {candidate.tags.length > 0 && (
+   295→          <div className="flex flex-wrap gap-1">
+   296→            {candidate.tags.slice(0, 4).map((t) => (
+   297→              <Badge key={t} variant="outline" className="text-[10px]">
+   298→                {t}
+   299→              </Badge>
+   300→            ))}
+   301→          </div>
+   302→        )}
+   303→
+   304→        {candidate.tools.length > 0 && (
+   305→          <div className="flex flex-wrap gap-1">
+   306→            {candidate.tools.slice(0, 3).map((t) => (
+   307→              <span
+   308→                key={t}
+   309→                className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary"
+   310→              >
+   311→                {t}
+   312→              </span>
+   313→            ))}
+   314→          </div>
+   315→        )}
+   316→
+   317→        <Button variant="ghost" size="sm" className="w-full" onClick={(e) => {
+   318→          e.stopPropagation()
+   319→          onOpen(candidate.id)
+   320→        }}>
+   321→          View profile
+   322→        </Button>
+   323→      </CardContent>
+   324→    </Card>
+   325→  )
+   326→}
+   327→
+   328→function CandidateDetail({
+   329→  candidate,
+   330→  open,
+   331→  onOpenChange,
+   332→}: {
+   333→  candidate: CandidateDTO | null
+   334→  open: boolean
+   335→  onOpenChange: (v: boolean) => void
+   336→}) {
+   337→  const restructure = useRestructureCandidate()
+   338→  const del = useDeleteCandidate()
+   339→  const update = useUpdateCandidate()
+   340→  const [editOpen, setEditOpen] = useState(false)
+   341→
+   342→  if (!candidate) {
+   343→    return (
+   344→      <Sheet open={open} onOpenChange={onOpenChange}>
+   345→        <SheetContent side="right" className="w-full sm:max-w-xl p-0">
+   346→          <SheetHeader className="px-6 pt-6">
+   347→            <SheetTitle>Loading…</SheetTitle>
+   348→          </SheetHeader>
+   349→        </SheetContent>
+   350→      </Sheet>
+   351→    )
+   352→  }
+   353→
+   354→  return (
+   355→    <Sheet open={open} onOpenChange={onOpenChange}>
+   356→      <SheetContent
+   357→        side="right"
+   358→        className="w-full sm:max-w-xl lg:max-w-2xl p-0 flex flex-col"
+   359→      >
+   360→        <SheetHeader className="px-6 pt-6 pb-2 border-b">
+   361→          <SheetTitle className="flex items-center gap-3">
+   362→            <Avatar className="size-10">
+   363→              <AvatarFallback className="bg-primary/10 text-primary font-medium">
+   364→                {initials(candidate.name)}
+   365→              </AvatarFallback>
+   366→            </Avatar>
+   367→            <div className="min-w-0">
+   368→              <div className="truncate">{candidate.name}</div>
+   369→              <SheetDescription className="truncate">
+   370→                {candidate.headline}
+   371→              </SheetDescription>
+   372→            </div>
+   373→          </SheetTitle>
+   374→        </SheetHeader>
+   375→
+   376→        <ScrollArea className="flex-1">
+   377→          <div className="px-6 py-4 space-y-6 ocean-scroll">
+   378→            {/* Header info */}
+   379→            <div className="flex items-center gap-2 flex-wrap">
+   380→              <CandidateStatusBadge status={candidate.status} />
+   381→              <span className="text-xs text-muted-foreground">
+   382→                Added {relativeTime(candidate.createdAt)} · updated {relativeTime(candidate.updatedAt)}
+   383→              </span>
+   384→            </div>
+   385→
+   386→            <div className="grid grid-cols-2 gap-3">
+   387→              <div className="space-y-0.5">
+   388→                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Location</div>
+   389→                <div className="text-sm font-medium">{candidate.location}</div>
+   390→              </div>
+   391→              {candidate.email && (
+   392→                <div className="space-y-0.5">
+   393→                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Email</div>
+   394→                  <a href={`mailto:${candidate.email}`} className="text-sm text-primary hover:underline flex items-center gap-1 truncate">
+   395→                    <Mail className="size-3" />
+   396→                    {candidate.email}
+   397→                  </a>
+   398→                </div>
+   399→              )}
+   400→              {candidate.phone && (
+   401→                <div className="space-y-0.5">
+   402→                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Phone</div>
+   403→                  <div className="text-sm flex items-center gap-1"><Phone className="size-3" />{candidate.phone}</div>
+   404→                </div>
+   405→              )}
+   406→              {candidate.linkedinUrl && (
+   407→                <div className="space-y-0.5">
+   408→                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">LinkedIn</div>
+   409→                  <a href={candidate.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1 truncate">
+   410→                    <Linkedin className="size-3" /> Profile
+   411→                  </a>
+   412→                </div>
+   413→              )}
+   414→              {candidate.githubUrl && (
+   415→                <div className="space-y-0.5">
+   416→                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">GitHub</div>
+   417→                  <a href={candidate.githubUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1 truncate">
+   418→                    <Github className="size-3" /> Profile
+   419→                  </a>
+   420→                </div>
+   421→              )}
+   422→            </div>
+   423→
+   424→            {candidate.tags.length > 0 && (
+   425→              <div>
+   426→                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Tags</div>
+   427→                <div className="flex flex-wrap gap-1.5">
+   428→                  {candidate.tags.map((t) => (
+   429→                    <Badge key={t} variant="outline">{t}</Badge>
+   430→                  ))}
+   431→                </div>
+   432→              </div>
+   433→            )}
+   434→
+   435→            <Separator />
+   436→
+   437→            {/* Outcomes */}
+   438→            {candidate.outcomes.length > 0 && (
+   439→              <section>
+   440→                <h3 className="flex items-center gap-2 text-sm font-semibold mb-2">
+   441→                  <Sparkles className="size-4 text-primary" />
+   442→                  Outcomes (what they've built)
+   443→                </h3>
+   444→                <ul className="space-y-1">
+   445→                  {candidate.outcomes.map((o, i) => (
+   446→                    <li key={i} className="text-sm text-foreground/80 flex items-start gap-2">
+   447→                      <span className="mt-1.5 size-1 rounded-full bg-primary shrink-0" />
+   448→                      <span>{o}</span>
+   449→                    </li>
+   450→                  ))}
+   451→                </ul>
+   452→              </section>
+   453→            )}
+   454→
+   455→            {/* Roles fit */}
+   456→            {candidate.rolesFit.length > 0 && (
+   457→              <section>
+   458→                <h3 className="text-sm font-semibold mb-2">Could fill these roles even without the title</h3>
+   459→                <div className="flex flex-wrap gap-1.5">
+   460→                  {candidate.rolesFit.map((r) => (
+   461→                    <Badge key={r} className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
+   462→                      {r}
+   463→                    </Badge>
+   464→                  ))}
+   465→                </div>
+   466→              </section>
+   467→            )}
+   468→
+   469→            {/* Skills & tools */}
+   470→            <div className="grid sm:grid-cols-2 gap-4">
+   471→              {candidate.skills.length > 0 && (
+   472→                <section>
+   473→                  <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Skills</h3>
+   474→                  <div className="flex flex-wrap gap-1.5">
+   475→                    {candidate.skills.map((s) => (
+   476→                      <Badge key={s} variant="secondary">{s}</Badge>
+   477→                    ))}
+   478→                  </div>
+   479→                </section>
+   480→              )}
+   481→              {candidate.tools.length > 0 && (
+   482→                <section>
+   483→                  <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Tools</h3>
+   484→                  <div className="flex flex-wrap gap-1.5">
+   485→                    {candidate.tools.map((t) => (
+   486→                      <span key={t} className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">
+   487→                        {t}
+   488→                      </span>
+   489→                    ))}
+   490→                  </div>
+   491→                </section>
+   492→              )}
+   493→            </div>
+   494→
+   495→            {/* Company stages */}
+   496→            {candidate.companyStages.length > 0 && (
+   497→              <section>
+   498→                <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Company stages worked at</h3>
+   499→                <div className="flex flex-wrap gap-1.5">
+   500→                  {candidate.companyStages.map((s) => (
+   501→                    <Badge key={s} variant="outline" className="capitalize">{s}</Badge>
+   502→                  ))}
+   503→                </div>
+   504→              </section>
+   505→            )}
+   506→
+   507→            {/* Work context */}
+   508→            {candidate.workContext && (
+   509→              <section>
+   510→                <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Work context</h3>
+   511→                <blockquote className="border-l-2 border-primary/40 pl-3 italic text-sm text-foreground/80">
+   512→                  {candidate.workContext}
+   513→                </blockquote>
+   514→              </section>
+   515→            )}
+   516→
+   517→            <Separator />
+   518→
+   519→            {/* Raw profile */}
+   520→            <section>
+   521→              <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Raw profile</h3>
+   522→              <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-md bg-muted/40 p-3 text-xs font-mono ocean-scroll">
+   523→                {candidate.rawProfile}
+   524→              </pre>
+   525→            </section>
+   526→
+   527→            <div className="flex flex-wrap gap-2 pb-4">
+   528→              <Button
+   529→                variant="outline"
+   530→                size="sm"
+   531→                onClick={() => restructure.mutate(candidate.id)}
+   532→                disabled={restructure.isPending}
+   533→              >
+   534→                {restructure.isPending ? (
+   535→                  <Loader2 className="size-4 animate-spin" />
+   536→                ) : (
+   537→                  <Sparkles className="size-4" />
+   538→                )}
+   539→                Re-structure with AI
+   540→              </Button>
+   541→              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+   542→                <Pencil className="size-4" />
+   543→                Edit
+   544→              </Button>
+   545→              <AlertDialog>
+   546→                <AlertDialogTrigger asChild>
+   547→                  <Button variant="outline" size="sm" className="text-destructive">
+   548→                    <Trash2 className="size-4" />
+   549→                    Delete
+   550→                  </Button>
+   551→                </AlertDialogTrigger>
+   552→                <AlertDialogContent>
+   553→                  <AlertDialogHeader>
+   554→                    <AlertDialogTitle>Delete this candidate?</AlertDialogTitle>
+   555→                    <AlertDialogDescription>
+   556→                      This will permanently remove {candidate.name} from the database.
+   557→                    </AlertDialogDescription>
+   558→                  </AlertDialogHeader>
+   559→                  <AlertDialogFooter>
+   560→                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+   561→                    <AlertDialogAction
+   562→                      onClick={() => {
+   563→                        del.mutate(candidate.id, {
+   564→                          onSettled: () => onOpenChange(false),
+   565→                        })
+   566→                      }}
+   567→                    >
+   568→                      Delete candidate
+   569→                    </AlertDialogAction>
+   570→                  </AlertDialogFooter>
+   571→                </AlertDialogContent>
+   572→              </AlertDialog>
+   573→            </div>
+   574→          </div>
+   575→        </ScrollArea>
+   576→
+   577→        <EditCandidateDialog
+   578→          key={candidate.id}
+   579→          candidate={candidate}
+   580→          open={editOpen}
+   581→          onOpenChange={setEditOpen}
+   582→          onSave={(body) => update.mutate({ id: candidate.id, body })}
+   583→          saving={update.isPending}
+   584→        />
+   585→      </SheetContent>
+   586→    </Sheet>
+   587→  )
+   588→}
+   589→
+   590→function EditCandidateDialog({
+   591→  candidate,
+   592→  open,
+   593→  onOpenChange,
+   594→  onSave,
+   595→  saving,
+   596→}: {
+   597→  candidate: CandidateDTO
+   598→  open: boolean
+   599→  onOpenChange: (v: boolean) => void
+   600→  onSave: (body: Record<string, unknown>) => void
+   601→  saving: boolean
+   602→}) {
+   603→  const [form, setForm] = useState({
+   604→    name: candidate.name,
+   605→    headline: candidate.headline,
+   606→    location: candidate.location,
+   607→    status: candidate.status,
+   608→    email: candidate.email ?? '',
+   609→    phone: candidate.phone ?? '',
+   610→  })
+   611→
+   612→  return (
+   613→    <Dialog open={open} onOpenChange={onOpenChange}>
+   614→      <DialogContent>
+   615→        <DialogHeader>
+   616→          <DialogTitle>Edit candidate</DialogTitle>
+   617→        </DialogHeader>
+   618→        <div className="space-y-3">
+   619→          <div className="space-y-1.5">
+   620→            <Label htmlFor="ec-name">Name</Label>
+   621→            <Input
+   622→              id="ec-name"
+   623→              value={form.name}
+   624→              onChange={(e) => setForm({ ...form, name: e.target.value })}
+   625→            />
+   626→          </div>
+   627→          <div className="space-y-1.5">
+   628→            <Label htmlFor="ec-headline">Headline</Label>
+   629→            <Input
+   630→              id="ec-headline"
+   631→              value={form.headline}
+   632→              onChange={(e) => setForm({ ...form, headline: e.target.value })}
+   633→            />
+   634→          </div>
+   635→          <div className="space-y-1.5">
+   636→            <Label htmlFor="ec-loc">Location</Label>
+   637→            <Input
+   638→              id="ec-loc"
+   639→              value={form.location}
+   640→              onChange={(e) => setForm({ ...form, location: e.target.value })}
+   641→            />
+   642→          </div>
+   643→          <div className="space-y-1.5">
+   644→            <Label htmlFor="ec-status">Status</Label>
+   645→            <Input
+   646→              id="ec-status"
+   647→              value={form.status}
+   648→              onChange={(e) => setForm({ ...form, status: e.target.value })}
+   649→            />
+   650→          </div>
+   651→          <div className="space-y-1.5">
+   652→            <Label htmlFor="ec-email">Email</Label>
+   653→            <Input
+   654→              id="ec-email"
+   655→              value={form.email}
+   656→              onChange={(e) => setForm({ ...form, email: e.target.value })}
+   657→            />
+   658→          </div>
+   659→          <div className="space-y-1.5">
+   660→            <Label htmlFor="ec-phone">Phone</Label>
+   661→            <Input
+   662→              id="ec-phone"
+   663→              value={form.phone}
+   664→              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+   665→            />
+   666→          </div>
+   667→        </div>
+   668→        <DialogFooter>
+   669→          <Button
+   670→            onClick={() => {
+   671→              onSave({
+   672→                name: form.name,
+   673→                headline: form.headline,
+   674→                location: form.location,
+   675→                status: form.status,
+   676→                email: form.email || null,
+   677→                phone: form.phone || null,
+   678→              })
+   679→              onOpenChange(false)
+   680→            }}
+   681→            disabled={saving}
+   682→          >
+   683→            {saving && <Loader2 className="size-4 animate-spin" />}
+   684→            Save
+   685→          </Button>
+   686→        </DialogFooter>
+   687→      </DialogContent>
+   688→    </Dialog>
+   689→  )
+   690→}
+   691→
+   692→function CandidateGridSkeleton() {
+   693→  return (
+   694→    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   695→      {Array.from({ length: 6 }).map((_, i) => (
+   696→        <Skeleton key={i} className="h-40" />
+   697→      ))}
+   698→    </div>
+   699→  )
+   700→}
+   701→
+   702→function CandidateEmpty() {
+   703→  return (
+   704→    <Card className="border-dashed">
+   705→      <CardContent className="py-12 text-center">
+   706→        <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-primary/10">
+   707→          <Users className="size-6 text-primary" />
+   708→        </div>
+   709→        <h3 className="text-sm font-medium">No candidates yet</h3>
+   710→        <p className="text-xs text-muted-foreground mt-1">
+   711→          Add your first candidate to start matching against JDs.
+   712→        </p>
+   713→      </CardContent>
+   714→    </Card>
+   715→  )
+   716→}
+   717→
+   718→export function CandidatesView() {
+   719→  const { data: candidates, isLoading } = useCandidates()
+   720→  const [search, setSearch] = useState('')
+   721→  const [selectedId, setSelectedId] = useState<string | null>(null)
+   722→  const [sheetOpen, setSheetOpen] = useState(false)
+   723→
+   724→  const filtered = (candidates ?? []).filter((c) => {
+   725→    if (!search.trim()) return true
+   726→    const q = search.toLowerCase()
+   727→    return (
+   728→      c.name.toLowerCase().includes(q) ||
+   729→      c.headline.toLowerCase().includes(q) ||
+   730→      c.location.toLowerCase().includes(q) ||
+   731→      c.tools.some((t) => t.toLowerCase().includes(q)) ||
+   732→      c.tags.some((t) => t.toLowerCase().includes(q))
+   733→    )
+   734→  })
+   735→
+   736→  const selected = filtered.find((c) => c.id === selectedId) ?? null
+   737→
+   738→  function open(id: string) {
+   739→    setSelectedId(id)
+   740→    setSheetOpen(true)
+   741→  }
+   742→
+   743→  return (
+   744→    <div className="space-y-4">
+   745→      <Card>
+   746→        <CardHeader className="flex-row items-center justify-between gap-2">
+   747→          <div>
+   748→            <CardTitle className="flex items-center gap-2">
+   749→              <Users className="size-4 text-primary" />
+   750→              Candidate database
+   751→            </CardTitle>
+   752→            <CardDescription className="mt-1">
+   753→              Structured, outcome-based profiles — the foundation the matcher runs on.
+   754→            </CardDescription>
+   755→          </div>
+   756→          <AddCandidateDialog />
+   757→        </CardHeader>
+   758→        <CardContent>
+   759→          <div className="relative mb-4">
+   760→            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   761→            <Input
+   762→              value={search}
+   763→              onChange={(e) => setSearch(e.target.value)}
+   764→              placeholder="Search by name, headline, tool, location, or tag…"
+   765→              className="pl-9"
+   766→              aria-label="Search candidates"
+   767→            />
+   768→          </div>
+   769→
+   770→          {isLoading ? (
+   771→            <CandidateGridSkeleton />
+   772→          ) : filtered.length === 0 ? (
+   773→            search.trim() ? (
+   774→              <div className="py-8 text-center text-sm text-muted-foreground">
+   775→                No candidates match "{search}".
+   776→              </div>
+   777→            ) : (
+   778→              <CandidateEmpty />
+   779→            )
+   780→          ) : (
+   781→            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   782→              {filtered.map((c) => (
+   783→                <CandidateCard key={c.id} candidate={c} onOpen={open} />
+   784→              ))}
+   785→            </div>
+   786→          )}
+   787→        </CardContent>
+   788→      </Card>
+   789→
+   790→      <CandidateDetail
+   791→        candidate={selected}
+   792→        open={sheetOpen}
+   793→        onOpenChange={setSheetOpen}
+   794→      />
+   795→    </div>
+   796→  )
+   797→}
+   798→

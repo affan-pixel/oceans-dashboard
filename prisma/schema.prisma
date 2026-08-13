@@ -1,0 +1,306 @@
+// Ocean Talent — Prisma schema
+// Two AI agents: Customer Finder (leads/signals/ICP) + Talent Matcher (JD/candidates/matches)
+
+generator client {
+  provider        = "prisma-client-js"
+  // native = local dev (macOS/linux); linux-musl-openssl-3.0.x = Railway nixpack runtime.
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Agent 2: Talent Matcher ----------
+
+model Candidate {
+  id           String   @id @default(cuid())
+  name         String
+  headline     String   // current / most recent role title
+  email        String?
+  phone        String?
+  location     String   // e.g. "Colombo, Sri Lanka"
+  linkedinUrl  String?
+  githubUrl    String?
+
+  // Raw freeform experience text (what they actually did)
+  rawProfile   String
+
+  // Structured extraction (JSON strings — produced by AI structuring)
+  outcomes       String // JSON array of strings: what they have built/delivered
+  skills         String // JSON array of strings: tools & technologies
+  tools          String // JSON array of strings
+  companyStages  String // JSON array of strings: e.g. ["early","growth","scaled"]
+  rolesFit       String // JSON array of strings: roles they could fill (even w/o title)
+  workContext    String // short text: best environment for them
+
+  // Searchable text blob used for matching
+  searchBlob     String
+
+  status       String   @default("active") // active | placed | paused
+  tags         String   @default("[]") // JSON array
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  matchResults MatchResult[]
+}
+
+model JobDescription {
+  id           String   @id @default(cuid())
+  title        String   // role title as written in JD
+  company      String?
+  rawText      String
+
+  // Structured extraction (JSON strings — produced by parseJD)
+  outcomes       String // JSON array of strings
+  mandatorySkills String // JSON array
+  niceToHave     String // JSON array
+  context        String // text: stage / team size / budget
+  signals        String // JSON array of strings (e.g. "scrappy","zero to one")
+
+  searchBlob     String
+
+  // Active search tracking — "these are jobs I'm looking for"
+  isActive      Boolean  @default(false)
+  priority      String   @default("medium") // high | medium | low
+  notes         String?  // freeform notes about this search
+  targetId      String?  // optional link to a JobTarget
+
+  // Flow tracking — where did this job come from?
+  source        String   @default("sales_team") // agent | sales_team | client
+
+  status       String   @default("parsed") // parsed | matched | delivered
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  matches      Match[]
+}
+
+// External prospects scraped AFTER internal matching is weak.
+// These are NOT in the candidate pool yet — they are surfaced prospects to review.
+model ExternalProspect {
+  id           String   @id @default(cuid())
+  matchId      String   // link to the Match that triggered the scrape
+  match        Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  name         String
+  headline     String   // current/most recent role title at external source
+  location     String?
+  sourceUrl    String?  // LinkedIn / Indeed / Wellfound profile URL
+  sourcePlatform String // linkedin | indeed | wellfound | github | other
+  snippet      String   // short bio / summary scraped
+  fitReason    String?  // why the scraper thinks they fit this JD
+  score        Int      @default(0) // 0-100 estimated fit
+  status       String   @default("new") // new | reviewed | promoted | rejected
+  createdAt    DateTime @default(now())
+}
+
+// Role-side ICPs — "kinds of roles Oceans fills" (EA, Marketing, Finance, Ops, CS, GTM…).
+// Each ICP drives its own job scraping on LinkedIn / Indeed / Wellfound.
+model JobTarget {
+  id           String   @id @default(cuid())
+  name         String   // e.g. "Executive Assistants (EA+)", "Marketing Divers"
+  description  String?
+  roleTypes    String   @default("[]") // JSON array: ["Executive Assistant","EA+"]
+  stages       String   @default("[]") // JSON array: ["Series A","Seed"]
+  industries   String   @default("[]") // JSON array: ["SaaS","Fintech"]
+  regions      String   @default("[]") // JSON array: ["USA","Europe"]
+  salaryMinUsd Int?
+  remoteOnly   Boolean  @default(true)
+  signals      String   @default("[]") // JSON array: ["scrappy","zero-to-one"]
+  keywords     String   @default("[]") // JSON array: freeform keywords to watch
+
+  // Scrape tracking — each ICP scrapes job boards independently
+  scrapeStatus     String   @default("idle") // idle | running | done | failed
+  lastScrapedAt    DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  scrapedJobs  ScrapedJob[]
+}
+
+// Jobs scraped from LinkedIn / Indeed / Wellfound / GitHub — linked to the ICP that found them.
+// These are NOT in the JD library yet — they are surfaced prospects to review + convert.
+model ScrapedJob {
+  id           String   @id @default(cuid())
+  jobTargetId  String   // the ICP that found this job
+  jobTarget    JobTarget @relation(fields: [jobTargetId], references: [id], onDelete: Cascade)
+
+  title        String   // role title as posted
+  company      String   // hiring company
+  location     String?
+  region       String?  // USA | Europe | Australia | Global
+  salaryText   String?  // raw salary string e.g. "$90k-$120k"
+  sourcePlatform String // linkedin | indeed | wellfound | github | remoteok | weworkremotely | vc-portfolio | yc | newsletter | ramp | harmonic | other
+  sourceUrl    String?  // link to the job posting
+  snippet      String   // short description from the posting
+  fitReason    String?  // why this job matches the ICP
+  jdId         String?  // if converted, link to the created JobDescription
+  status       String   @default("new") // new | dm_found | outreach_sent | replied | converted | dismissed
+  postedAt     String?  // raw date string from the source (ISO if available)
+  scrapeSource String?  // which scraper found this: remoteok-api | crawl4ai:* | jina | firecrawl | apify | vc-portfolio | yc | ramp | harmonic | newsletter | simulated
+
+  // ---- Decision maker (Step 2 of pipeline) ----
+  dmName        String? // the person who owns the hire (founder / CEO / hiring manager)
+  dmTitle       String? // their title e.g. "Co-founder & CEO"
+  dmLinkedinUrl String? // their LinkedIn profile URL
+  dmNotes       String? // freeform notes on how to reach them / why them
+  dmIsSample    Boolean  @default(false) // true when DM is labeled sample data (real lookup unavailable)
+
+  // ---- Warm-intro referrers (who can recommend Oceans for an intro) ----
+  // JSON array of { name, title, linkedinUrl, relation, reason } — people connected
+  // to the company/DM who could make a warm introduction to Oceans.
+  referrers    String   @default("[]")
+
+  // ---- Outreach (Step 3 of pipeline) ----
+  outreachStatus  String?  // drafted | sent | replied
+  outreachContent String?  // drafted outreach email body
+  outreachSentAt  DateTime?
+
+  createdAt    DateTime @default(now())
+}
+
+// Freeform input / scratchpad — "a place where we can give input"
+model Brief {
+  id           String   @id @default(cuid())
+  title        String
+  content      String   // freeform text
+  type         String   @default("note") // note | jd_draft | role_description | context
+  linkedJdId   String?  // if this brief was converted into a JD
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Match {
+  id            String   @id @default(cuid())
+  jobDescriptionId String
+  jobDescription JobDescription @relation(fields: [jobDescriptionId], references: [id], onDelete: Cascade)
+
+  status        String   @default("running") // running | done | failed
+  summary       String?  // one-line overall summary
+  internalStrength String? // "strong" | "moderate" | "weak" — did the internal pool cover it?
+  externalScrapeStatus String @default("none") // none | requested | done | failed
+  createdAt     DateTime @default(now())
+
+  results       MatchResult[]
+  externalProspects ExternalProspect[]
+}
+
+model MatchResult {
+  id           String   @id @default(cuid())
+  matchId      String
+  match        Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  candidateId  String
+  candidate    Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  score        Int      // 0-100 semantic match score
+  reasoning    String   // one paragraph why they match
+  strengths    String   // JSON array of strings
+  gaps         String   // JSON array of strings
+  rank         Int      // 1-based rank in the shortlist
+}
+
+// ---------- Agent 1: Customer Finder ----------
+
+model Lead {
+  id           String   @id @default(cuid())
+  companyName  String
+  domain       String?
+  website      String?
+  industry     String?
+  stage        String?  // Series A / B / C / Bootstrapped
+  sizeMin      Int?     // employee range
+  sizeMax      Int?
+  location     String?  // HQ city/country
+  region       String?  // USA | Europe | Australia
+
+  // ICP scoring
+  icpScore     Int      @default(0)  // 0-100
+  priority     String   @default("medium") // high | medium | low
+  status       String   @default("new") // new | contacted | replied | qualified | won | lost
+
+  // Origin strategy
+  sourceStrategy String? // mirror | signal | warm_intro | icp_track
+  mirroredFromClientId String? // if mirrored from existing client
+
+  notes        String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  signals      Signal[]
+  outreachSteps OutreachStep[]
+}
+
+model Signal {
+  id           String   @id @default(cuid())
+  leadId       String
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  type         String   // funding | job_post | headcount_growth | tech_stack | no_local_hire | warm_intro
+  title        String
+  description  String
+  source       String?  // Crunchbase | LinkedIn | Indeed | Clay | BuiltWith
+  weight       Int      @default(5) // contribution to icpScore
+  capturedAt   DateTime @default(now())
+}
+
+model OutreachStep {
+  id           String   @id @default(cuid())
+  leadId       String
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  step         Int      // 1-based sequence step
+  channel      String   // email | linkedin | manual
+  action       String   // e.g. "Personalised email #1", "LinkedIn connect"
+  content      String?  // drafted message
+  status       String   @default("pending") // pending | sent | replied | bounced
+  scheduledAt  DateTime?
+  sentAt       DateTime?
+  createdAt    DateTime @default(now())
+}
+
+model IcpConfig {
+  id           String   @id @default("singleton")
+  // JSON strings for multi-value attributes (seeded via application layer)
+  sizeMin      Int      @default(15)
+  sizeMax      Int      @default(200)
+  stages       String   @default("[]")
+  locations    String   @default("[]")
+  industries   String   @default("[]")
+  hiringPattern String  @default("remote-first or remote-open")
+  budgetMinUsd Int      @default(80000)
+  pain         String   @default("Cannot fill technical or GTM roles locally at the price they want")
+  updatedAt    DateTime @updatedAt
+}
+
+model Activity {
+  id           String   @id @default(cuid())
+  agent        String   // customer_finder | talent_matcher | system
+  type         String   // lead_created | signal_captured | jd_parsed | match_completed | outreach_sent ...
+  message      String
+  meta         String?  // JSON
+  createdAt    DateTime @default(now())
+}
+
+// Third-party app integrations (Apify, Apollo, Lemlist, HubSpot, Clay…).
+// API keys are stored AES-256-GCM encrypted (see src/lib/crypto.ts).
+// The app works without any keys connected (LLM-simulated fallback) and upgrades
+// to real API calls when a key is added here.
+model Integration {
+  id           String   @id @default(cuid())
+  provider     String   @unique // apify | apollo | lemlist | hubspot | clay
+  label        String   // display name
+  apiKeyEnc    String?  // AES-256-GCM encrypted API key
+  keyHint      String?  // last 4 chars for display (e.g. "••••2a")
+  status       String   @default("disconnected") // connected | disconnected | error
+  config       String   @default("{}") // JSON — extra config (e.g. default actor IDs)
+  lastSyncedAt DateTime?
+  lastError    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

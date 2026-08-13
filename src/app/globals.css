@@ -1,0 +1,193 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/*
+  OCEANS brand palette — taken from oceanstalent.com
+  Signature navy #03456D, light-blue tints, cream neutral, indigo + orange accents.
+  Converted to OKLCH for Tailwind v4.
+    navy   #03456D → oklch(0.42 0.09 244)
+    sky    #CFE8F0 → oklch(0.90 0.03 230)
+    cream  #e9eddc → oklch(0.93 0.02 110)
+    indigo #4d65ff → oklch(0.55 0.22 264)
+    orange #ff7229 → oklch(0.68 0.18 42)
+*/
+:root {
+  --radius: 0.625rem;
+  --background: oklch(0.99 0.005 230);
+  --foreground: oklch(0.28 0.02 245);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.28 0.02 245);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.28 0.02 245);
+  --primary: oklch(0.42 0.09 244);
+  --primary-foreground: oklch(0.99 0.005 230);
+  --secondary: oklch(0.95 0.015 230);
+  --secondary-foreground: oklch(0.42 0.09 244);
+  --muted: oklch(0.96 0.012 230);
+  --muted-foreground: oklch(0.52 0.02 245);
+  --accent: oklch(0.90 0.03 230);
+  --accent-foreground: oklch(0.42 0.09 244);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.90 0.015 230);
+  --input: oklch(0.90 0.015 230);
+  --ring: oklch(0.42 0.09 244);
+  --chart-1: oklch(0.42 0.09 244);   /* navy */
+  --chart-2: oklch(0.55 0.22 264);   /* indigo */
+  --chart-3: oklch(0.68 0.18 42);    /* orange */
+  --chart-4: oklch(0.70 0.10 200);   /* sky blue */
+  --chart-5: oklch(0.80 0.05 110);   /* cream-sage */
+  /* Sidebar = signature Oceans navy panel */
+  --sidebar: oklch(0.42 0.09 244);
+  --sidebar-foreground: oklch(0.97 0.01 230);
+  --sidebar-primary: oklch(0.90 0.03 230);
+  --sidebar-primary-foreground: oklch(0.30 0.08 244);
+  --sidebar-accent: oklch(0.36 0.08 244);
+  --sidebar-accent-foreground: oklch(0.97 0.01 230);
+  --sidebar-border: oklch(0.97 0.01 230 / 12%);
+  --sidebar-ring: oklch(0.55 0.22 264);
+}
+
+.dark {
+  --background: oklch(0.16 0.02 244);
+  --foreground: oklch(0.97 0.01 230);
+  --card: oklch(0.21 0.025 244);
+  --card-foreground: oklch(0.97 0.01 230);
+  --popover: oklch(0.21 0.025 244);
+  --popover-foreground: oklch(0.97 0.01 230);
+  --primary: oklch(0.62 0.10 240);
+  --primary-foreground: oklch(0.16 0.02 244);
+  --secondary: oklch(0.27 0.02 244);
+  --secondary-foreground: oklch(0.97 0.01 230);
+  --muted: oklch(0.27 0.02 244);
+  --muted-foreground: oklch(0.70 0.015 230);
+  --accent: oklch(0.30 0.05 244);
+  --accent-foreground: oklch(0.90 0.03 230);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(0.97 0.01 230 / 10%);
+  --input: oklch(0.97 0.01 230 / 15%);
+  --ring: oklch(0.62 0.10 240);
+  --chart-1: oklch(0.62 0.10 240);
+  --chart-2: oklch(0.55 0.22 264);
+  --chart-3: oklch(0.68 0.18 42);
+  --chart-4: oklch(0.70 0.10 200);
+  --chart-5: oklch(0.80 0.05 110);
+  --sidebar: oklch(0.21 0.03 244);
+  --sidebar-foreground: oklch(0.97 0.01 230);
+  --sidebar-primary: oklch(0.62 0.10 240);
+  --sidebar-primary-foreground: oklch(0.16 0.02 244);
+  --sidebar-accent: oklch(0.30 0.05 244);
+  --sidebar-accent-foreground: oklch(0.97 0.01 230);
+  --sidebar-border: oklch(0.97 0.01 230 / 10%);
+  --sidebar-ring: oklch(0.62 0.10 240);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* Custom scrollbar — Oceans navy */
+  .ocean-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .ocean-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .ocean-scroll::-webkit-scrollbar-thumb {
+    background: oklch(0.42 0.09 244 / 0.3);
+    border-radius: 9999px;
+  }
+  .ocean-scroll::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.42 0.09 244 / 0.5);
+  }
+
+  /* Oceans signature gradients — the "color lines" decorative style */
+  /* Full navy → indigo gradient (logo tile, hero panels, primary buttons) */
+  .ocean-gradient {
+    background: linear-gradient(135deg, oklch(0.42 0.09 244) 0%, oklch(0.55 0.22 264) 100%);
+  }
+  /* Soft tinted gradient (section backgrounds, highlight cards) */
+  .ocean-gradient-soft {
+    background: linear-gradient(135deg, oklch(0.95 0.02 230) 0%, oklch(0.93 0.02 110) 100%);
+  }
+  /* Hero / dark panel gradient — deep navy */
+  .ocean-gradient-hero {
+    background: linear-gradient(135deg, oklch(0.34 0.08 244) 0%, oklch(0.42 0.09 244) 50%, oklch(0.40 0.10 258) 100%);
+  }
+  /* The signature "color line" — a thin horizontal gradient accent bar
+     navy → indigo → orange (used under section titles, as card top-borders, dividers) */
+  .ocean-accent-line {
+    background: linear-gradient(90deg,
+      oklch(0.42 0.09 244) 0%,
+      oklch(0.55 0.22 264) 45%,
+      oklch(0.68 0.18 42) 100%);
+  }
+  /* Vertical color line variant (for sidebar accents, card left-borders) */
+  .ocean-accent-line-v {
+    background: linear-gradient(180deg,
+      oklch(0.42 0.09 244) 0%,
+      oklch(0.55 0.22 264) 50%,
+      oklch(0.68 0.18 42) 100%);
+  }
+  /* Gradient text — for big numbers / hero titles */
+  .ocean-text-gradient {
+    background: linear-gradient(135deg, oklch(0.42 0.09 244) 0%, oklch(0.55 0.22 264) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  /* Card with subtle navy→white gradient surface + soft shadow (the uploaded-image card style) */
+  .ocean-card-gradient {
+    background: linear-gradient(160deg, oklch(1 0 0) 0%, oklch(0.97 0.015 230) 100%);
+    box-shadow: 0 1px 2px oklch(0.42 0.09 244 / 0.06), 0 4px 12px oklch(0.42 0.09 244 / 0.04);
+  }
+}
