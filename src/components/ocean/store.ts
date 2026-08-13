@@ -9,6 +9,7 @@ export type ViewId =
   | 'targets'
   | 'candidates'
   | 'matches'
+  | 'integrations'
   | 'define'
 
 export type RegionFilter = 'all' | 'USA' | 'Europe' | 'Australia'
@@ -59,6 +60,10 @@ export const VIEW_TITLES: Record<ViewId, { title: string; subtitle: string }> = 
   matches: {
     title: 'Matches',
     subtitle: 'All past ranked shortlists produced by the Talent Matcher.',
+  },
+  integrations: {
+    title: 'Integrations',
+    subtitle: 'Connect Apify, Origami, Slack, HubSpot, Workable and more. Each key lights up its feature.',
   },
   define: {
     title: 'Define',

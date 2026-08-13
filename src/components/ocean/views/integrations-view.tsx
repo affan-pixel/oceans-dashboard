@@ -39,6 +39,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   enrichment: 'Enrichment',
   outreach: 'Outreach',
   crm: 'CRM',
+  leads: 'Lead finding',
+  messaging: 'Notifications',
+  ats: 'Talent pool',
 }
 
 function StatusBadge({ status }: { status: string }) {

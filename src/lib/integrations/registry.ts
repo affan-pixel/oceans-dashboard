@@ -7,7 +7,7 @@
 //   2. Register it in REGISTRY below
 //   3. (optional) wire it into a flow via getIntegration() + isConnected()
 
-export type Provider = 'apify' | 'apollo' | 'lemlist' | 'hubspot' | 'clay'
+export type Provider = 'apify' | 'apollo' | 'lemlist' | 'hubspot' | 'clay' | 'origami' | 'firecrawl' | 'slack' | 'workable'
 
 export interface IntegrationConfig {
   provider: Provider
@@ -16,7 +16,7 @@ export interface IntegrationConfig {
   docsUrl: string
   keyLabel: string // e.g. "API Token"
   keyPlaceholder: string
-  category: 'scraping' | 'enrichment' | 'outreach' | 'crm'
+  category: 'scraping' | 'enrichment' | 'outreach' | 'crm' | 'leads' | 'messaging' | 'ats'
   capabilities: string[] // e.g. ['job-scrape', 'lead-enrich']
 }
 
@@ -174,6 +174,101 @@ export const REGISTRY: Record<Provider, IntegrationAdapter> = {
       }
     },
   },
+
+  origami: {
+    provider: 'origami',
+    label: 'Origami',
+    description:
+      'AI lead-finding + multi-step LinkedIn & email outreach (origami.chat). Finds high-intent leads from LinkedIn and sets up email sequences — can drive Agent 1 lead-finding + outreach.',
+    docsUrl: 'https://origami.chat',
+    keyLabel: 'API Key',
+    keyPlaceholder: 'xxxxxxxxxxxxxxxxxxxxxxxx',
+    category: 'leads',
+    capabilities: ['lead-find', 'outreach-setup'],
+    test: async (apiKey: string): Promise<TestResult> => {
+      // Origami's API surface isn't publicly documented yet; this test just
+      // confirms the key is non-empty and well-formed. Real validation happens
+      // on first use. Update the endpoint here once Origami publishes API docs.
+      if (!apiKey || apiKey.length < 10) {
+        return { ok: false, message: 'Origami key looks too short — check it and try again.' }
+      }
+      return { ok: true, message: 'Origami key saved (validated on first use).', accountInfo: 'Key accepted.' }
+    },
+  },
+
+  firecrawl: {
+    provider: 'firecrawl',
+    label: 'Firecrawl',
+    description:
+      'Web scraping — scrapes JD pages + LinkedIn profiles into clean markdown. Replaces simulated external-prospect scraping with real data when connected.',
+    docsUrl: 'https://docs.firecrawl.dev/',
+    keyLabel: 'API Key',
+    keyPlaceholder: 'fc-xxxxxxxxxxxxxxxxxxxxxxxx',
+    category: 'scraping',
+    capabilities: ['job-scrape', 'profile-scrape'],
+    test: async (apiKey: string): Promise<TestResult> => {
+      try {
+        const res = await fetch('https://api.firecrawl.dev/v1/account', {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: AbortSignal.timeout(10_000),
+        })
+        if (res.status === 401 || res.status === 403) {
+          return { ok: false, message: 'Firecrawl rejected the API key.' }
+        }
+        return { ok: true, message: 'Connected to Firecrawl.', accountInfo: 'Key accepted.' }
+      } catch {
+        return { ok: false, message: 'Could not reach Firecrawl. Check the key and try again.' }
+      }
+    },
+  },
+
+  slack: {
+    provider: 'slack',
+    label: 'Slack',
+    description:
+      'Notifications + approvals. Posts opportunity matches (with match type + price) and accepts Approve/Reject button replies.',
+    docsUrl: 'https://api.slack.com/apps',
+    keyLabel: 'Bot Token (xoxb-)',
+    keyPlaceholder: 'xoxb-xxxxxxxxxxxx-xxxxxxxxxxxx',
+    category: 'messaging',
+    capabilities: ['notify', 'approval'],
+    test: async (apiKey: string): Promise<TestResult> => {
+      try {
+        const res = await fetch('https://slack.com/api/auth.test', {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: AbortSignal.timeout(10_000),
+        })
+        const data = (await res.json()) as { ok?: boolean; user?: string; team?: string }
+        if (!data.ok) {
+          return { ok: false, message: 'Slack rejected the bot token.' }
+        }
+        return { ok: true, message: 'Connected to Slack.', accountInfo: data.team ? `Team: ${data.team}` : undefined }
+      } catch {
+        return { ok: false, message: 'Could not reach Slack. Check the token and try again.' }
+      }
+    },
+  },
+
+  workable: {
+    provider: 'workable',
+    label: 'Workable',
+    description:
+      'Talent pool ATS — pulls Lagoon + Port candidate profiles into the matching pool when connected.',
+    docsUrl: 'https://dev.workable.com/',
+    keyLabel: 'API Token',
+    keyPlaceholder: 'xxxxxxxxxxxxxxxxxxxxxxxx',
+    category: 'ats',
+    capabilities: ['candidate-fetch'],
+    test: async (apiKey: string): Promise<TestResult> => {
+      // Real validation needs the subdomain; the adapter does the full call.
+      if (!apiKey || apiKey.length < 8) {
+        return { ok: false, message: 'Workable token looks too short.' }
+      }
+      return { ok: true, message: 'Workable token saved (validated on first sync).' }
+    },
+  },
 }
 
-export const ALL_PROVIDERS: Provider[] = ['apify', 'apollo', 'lemlist', 'hubspot', 'clay']
+export const ALL_PROVIDERS: Provider[] = [
+  'apify', 'origami', 'firecrawl', 'apollo', 'clay', 'workable', 'slack', 'lemlist', 'hubspot',
+]

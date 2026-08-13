@@ -11,6 +11,7 @@ import {
   Waves,
   X,
   Filter,
+  Plug,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -30,6 +31,7 @@ const NAV: NavItem[] = [
   { id: 'jds', label: 'Job Descriptions', icon: FileText },
   { id: 'candidates', label: 'Divers', icon: Users },
   { id: 'matches', label: 'Matches', icon: Sparkles },
+  { id: 'integrations', label: 'Integrations', icon: Plug },
   { id: 'define', label: 'Define', icon: Settings },
 ]
 

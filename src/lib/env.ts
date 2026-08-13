@@ -27,6 +27,9 @@ export const env = {
   apifyApiKey: b(process.env.APIFY_API_KEY),
   firecrawlApiKey: b(process.env.FIRECRAWL_API_KEY),
 
+  // AI lead-finding + outreach (origami.chat)
+  origamiApiKey: b(process.env.ORIGAMI_API_KEY),
+
   // Notifications + approvals
   slackBotToken: b(process.env.SLACK_BOT_TOKEN),
   slackSigningSecret: b(process.env.SLACK_SIGNING_SECRET),
@@ -46,6 +49,7 @@ export const env = {
   hasLlm: !!b(process.env.ZAI_API_KEY),
   hasApify: !!b(process.env.APIFY_API_KEY),
   hasFirecrawl: !!b(process.env.FIRECRAWL_API_KEY),
+  hasOrigami: !!b(process.env.ORIGAMI_API_KEY),
   hasSlack: !!b(process.env.SLACK_BOT_TOKEN),
   hasHubspot: !!b(process.env.HUBSPOT_ACCESS_TOKEN),
   hasWorkable: !!b(process.env.WORKABLE_API_KEY),
