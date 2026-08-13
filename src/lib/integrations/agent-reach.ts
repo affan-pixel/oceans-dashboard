@@ -296,7 +296,7 @@ const CURATED_LISTS: Array<{
   { name: 'Next Play newsletter', sourcePlatform: 'newsletter', url: 'https://nextplay.substack.com', kind: 'company-list' },
   { name: 'Early Days newsletter', sourcePlatform: 'newsletter', url: 'https://earlydaysbymerlin.substack.com', kind: 'company-list' },
   { name: 'a16z Build newsletter', sourcePlatform: 'newsletter', url: 'https://a16zbuild.substack.com', kind: 'company-list' },
-  { name: 'HN Who's Hiring', sourcePlatform: 'newsletter', url: 'https://news.ycombinator.com/jobs', kind: 'job-board' },
+  { name: "HN Who's Hiring", sourcePlatform: 'newsletter', url: 'https://news.ycombinator.com/jobs', kind: 'job-board' },
 ]
 
 const CURATED_PARSE_PROMPT = `You are a sourcing analyst for Oceans, a headhunting firm placing Sri Lankan talent with US startups. You receive raw markdown fetched from a list of companies / a job board (Ramp, Harmonic Hot 25, Sequoia/a16z/Index/Greylock portfolio jobs, YC, Founders You Should Know, etc.).

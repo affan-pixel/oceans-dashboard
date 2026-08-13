@@ -63,16 +63,20 @@ export async function POST(_request: Request, { params }: Params) {
     // 1. Apify FIRST when a key is present — real LinkedIn Jobs + Indeed + Wellfound.
     //    This is the preferred path (you have a key and want LinkedIn specifically).
     if (apifyKey) {
+      console.log('[scrape] Apify key present — running LinkedIn/Indeed/Wellfound actors')
       try {
         jobs = await scrapeJobsWithApify(apifyKey, icpInput)
-        source = 'apify'
+        console.log('[scrape] Apify returned', jobs.length, 'jobs')
+        if (jobs.length > 0) source = 'apify'
         if (await isConnected('apify')) await markSynced('apify', null)
       } catch (err) {
-        console.error('[scrape] Apify failed:', err)
+        console.error('[scrape] Apify failed:', err instanceof Error ? err.message : err)
         if (await isConnected('apify')) {
           await markSynced('apify', err instanceof Error ? err.message : 'Apify scrape failed')
         }
       }
+    } else {
+      console.log('[scrape] No Apify key — falling back to RemoteOK/curated lists')
     }
 
     // 2. If Apify returned nothing (or no key), try Agent Reach (RemoteOK API →
