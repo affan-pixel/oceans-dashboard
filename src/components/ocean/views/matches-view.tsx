@@ -99,7 +99,7 @@ function MatchCard({ match }: { match: MatchDTO }) {
                 Internal pool · {match.results.length} ranked
               </div>
               {match.results.map((r) => (
-                <MatchResultCard key={r.id} result={r} />
+                <MatchResultCard key={r.id} result={r} matchId={match.id} />
               ))}
             </div>
             <ExternalProspectsSection match={match} />

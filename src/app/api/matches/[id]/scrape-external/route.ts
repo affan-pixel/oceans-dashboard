@@ -93,7 +93,7 @@ export async function POST(_request: Request, { params }: Params) {
         jobDescription: { select: { title: true, company: true } },
         results: {
           include: {
-            candidate: { select: { name: true, headline: true, location: true } },
+            candidate: { select: { name: true, headline: true, location: true, pool: true, redactedProfile: true } },
           },
           orderBy: { rank: 'asc' },
         },

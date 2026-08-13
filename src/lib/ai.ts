@@ -250,7 +250,6 @@ export async function matchCandidates(
     return { summary: 'No candidates to match against.', ranked: [] }
   }
 
-  const zai = await getZai()
   const jdBlock = JSON.stringify(
     {
       title: jd.title,
@@ -280,43 +279,88 @@ export async function matchCandidates(
     2
   )
 
-  const completion = await zai.chat.completions.create({
-    messages: [
-      { role: 'assistant', content: MATCH_SYSTEM_PROMPT },
-      {
-        role: 'user',
-        content: `JOB DESCRIPTION (structured):\n${jdBlock}\n\nCANDIDATES (structured):\n${candBlock}\n\nRank the candidates by semantic fit. Return the top 5 with score, reasoning, strengths, and gaps.`,
-      },
-    ],
-    thinking: { type: 'disabled' },
-  })
+  try {
+    const zai = await getZai()
+    const completion = await zai.chat.completions.create({
+      messages: [
+        { role: 'assistant', content: MATCH_SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: `JOB DESCRIPTION (structured):\n${jdBlock}\n\nCANDIDATES (structured):\n${candBlock}\n\nRank the candidates by semantic fit. Return the top 5 with score, reasoning, strengths, and gaps.`,
+        },
+      ],
+      thinking: { type: 'disabled' },
+    })
 
-  const content = completion.choices[0]?.message?.content ?? ''
-  const parsed = extractJson(content) as {
-    summary?: string
-    ranked?: Array<{
-      candidateId?: string
-      score?: number
-      reasoning?: string
-      strengths?: unknown
-      gaps?: unknown
-    }>
+    const content = completion.choices[0]?.message?.content ?? ''
+    const parsed = extractJson(content) as {
+      summary?: string
+      ranked?: Array<{
+        candidateId?: string
+        score?: number
+        reasoning?: string
+        strengths?: unknown
+        gaps?: unknown
+      }>
+    }
+
+    const summary = (parsed.summary ?? 'Shortlist generated.').toString()
+    const ranked = Array.isArray(parsed.ranked)
+      ? parsed.ranked
+          .filter((r) => r && typeof r.candidateId === 'string')
+          .map((r) => ({
+            candidateId: String(r.candidateId),
+            score: Math.max(0, Math.min(100, Math.round(Number(r.score ?? 0)))),
+            reasoning: (r.reasoning ?? '').toString(),
+            strengths: asStringArray(r.strengths),
+            gaps: asStringArray(r.gaps),
+          }))
+      : []
+
+    return { summary, ranked }
+  } catch {
+    // LLM unavailable (no key) — heuristic sample ranking so the workflow is demoable.
+    // Scores candidates by keyword overlap between JD skills/outcomes and candidate
+    // skills/tools/roles. Clearly lower quality than the LLM but never blocks the flow.
+    return sampleMatch(jd, candidates)
   }
+}
 
-  const summary = (parsed.summary ?? 'Shortlist generated.').toString()
-  const ranked = Array.isArray(parsed.ranked)
-    ? parsed.ranked
-        .filter((r) => r && typeof r.candidateId === 'string')
-        .map((r) => ({
-          candidateId: String(r.candidateId),
-          score: Math.max(0, Math.min(100, Math.round(Number(r.score ?? 0)))),
-          reasoning: (r.reasoning ?? '').toString(),
-          strengths: asStringArray(r.strengths),
-          gaps: asStringArray(r.gaps),
-        }))
-    : []
+// Heuristic fallback match — used when the LLM is unavailable. Produces a ranked
+// shortlist based on keyword overlap so the full workflow can be demonstrated.
+function sampleMatch(
+  jd: StructuredJD,
+  candidates: CandidateForMatch[]
+): { summary: string; ranked: Array<{ candidateId: string; score: number; reasoning: string; strengths: string[]; gaps: string[] }> } {
+  const jdKeywords = [
+    ...jd.mandatorySkills,
+    ...jd.niceToHave,
+    ...jd.outcomes,
+    ...jd.title.toLowerCase().split(/\s+/),
+  ]
+    .map((k) => k.toLowerCase())
+    .filter((k) => k.length > 2)
 
-  return { summary, ranked }
+  const scored = candidates.map((c) => {
+    const blob = [c.headline, c.workContext, ...c.skills, ...c.tools, ...c.rolesFit, ...c.outcomes]
+      .join(' ')
+      .toLowerCase()
+    const hits = jdKeywords.filter((k) => blob.includes(k))
+    const score = Math.min(92, 55 + Math.round((hits.length / Math.max(jdKeywords.length, 1)) * 40))
+    return { candidate: c, score, hits }
+  })
+  scored.sort((a, b) => b.score - a.score)
+
+  return {
+    summary: '(Sample shortlist — LLM not configured. Add ZAI_API_KEY for real semantic matching.)',
+    ranked: scored.slice(0, 5).map(({ candidate, score, hits }) => ({
+      candidateId: candidate.id,
+      score,
+      reasoning: `(Sample match — LLM not configured.) ${candidate.name} (${candidate.headline}) shows overlap on: ${hits.slice(0, 5).join(', ') || 'general profile fit'}.`,
+      strengths: hits.slice(0, 3).length > 0 ? hits.slice(0, 3) : ['Relevant role family'],
+      gaps: ['Run with an LLM key for verified outcome-based fit'],
+    })),
+  }
 }
 
 // ---------------- Outreach message drafter (Agent 1 support) ----------------
@@ -799,4 +843,124 @@ export async function findReferrers(opts: {
         reason: String(r.reason ?? '').slice(0, 500),
       }
     })
+}
+
+// ---------------- Step 2: Categorize a scraped job ----------------
+// Infers seniority, key skills, and working timezone from the title + snippet.
+// Used on scrape + convert-to-JD so every job is tagged for filtering.
+
+export interface JobCategory {
+  seniority: string // junior | mid | senior | lead | exec
+  skills: string[] // key skills extracted
+  timezone: string // inferred timezone / overlap
+}
+
+const CATEGORIZE_PROMPT = `You are a job-categorization assistant for Oceans, a headhunting firm placing Sri Lankan talent with US startups. Read a job title + short description and infer:
+- seniority: one of junior | mid | senior | lead | exec (infer from title words like "Senior", "Lead", "VP", "Chief", "Founding", "Junior", or defaults to "mid")
+- skills: 3-6 key skills/tools the role needs (e.g. ["HubSpot","outbound prospecting","SQL"])
+- timezone: the working timezone the role implies, one of: "US-East" | "US-West" | "EU" | "APAC-overlap" | "Global". Remote roles default to "APAC-overlap" (Sri Lanka can overlap US mornings) unless the JD specifies otherwise.
+
+Return STRICT JSON only: {"seniority":"...","skills":["..."],"timezone":"..."}`
+
+export async function categorizeJob(title: string, snippet: string): Promise<JobCategory> {
+  try {
+    const zai = await getZai()
+    const completion = await zai.chat.completions.create({
+      messages: [
+        { role: 'assistant', content: CATEGORIZE_PROMPT },
+        { role: 'user', content: `Title: ${title}\nDescription: ${snippet.slice(0, 800)}` },
+      ],
+      thinking: { type: 'disabled' },
+    })
+    const parsed = extractJson(completion.choices[0]?.message?.content ?? '') as Partial<JobCategory>
+    const seniority = (['junior', 'mid', 'senior', 'lead', 'exec'].includes(String(parsed.seniority))
+      ? String(parsed.seniority)
+      : 'mid') as string
+    const skills = asStringArray(parsed.skills).slice(0, 6)
+    const tz = String(parsed.timezone ?? 'APAC-overlap')
+    return { seniority, skills, timezone: tz }
+  } catch {
+    // LLM unavailable — sensible defaults so categorization never blocks the flow.
+    return { seniority: 'mid', skills: [], timezone: 'APAC-overlap' }
+  }
+}
+
+// ---------------- Step 6: Generate Oceans-branded redacted profile ----------------
+// Strips all PII (name, email, phone, linkedin, github, raw CV) and produces an
+// Oceans-branded profile a prospect can see BEFORE a candidate is revealed.
+
+export interface RedactedProfile {
+  markdown: string
+  oceanId: string // e.g. "Oceans Diver · GTM-014"
+}
+
+const REDACT_PROMPT = `You write Oceans-branded redacted candidate profiles for a headhunting firm. You receive a structured candidate (outcomes, skills, tools, roles they fit, work context) and the match reasoning for a specific role.
+
+Produce a concise, professional profile markdown that:
+1. Replaces the candidate's real name with an Oceans Diver ID like "Oceans Diver · GTM-014" (pick a plausible category code from the role + a 3-digit number).
+2. NEVER includes email, phone, LinkedIn, GitHub, or any contact info.
+3. NEVER names current/past employers by name — refer to them as "a Series A SaaS startup", "a YC-backed dev-tools company", etc.
+4. Leads with a 1-line headline fit for this role, then "Why they fit", then "Outcomes delivered", then "Skills & tools".
+5. Is 150-220 words. Confident, specific, no fluff.
+
+Return STRICT JSON: {"oceanId":"Oceans Diver · ...","markdown":"# Oceans Diver · ...\\n\\n..."}`
+
+export async function generateRedactedProfile(opts: {
+  candidate: { outcomes: string[]; skills: string[]; tools: string[]; rolesFit: string[]; workContext: string; headline: string }
+  roleTitle: string
+  matchReasoning: string
+}): Promise<RedactedProfile> {
+  const zai = await getZai()
+  const completion = await zai.chat.completions.create({
+    messages: [
+      { role: 'assistant', content: REDACT_PROMPT },
+      {
+        role: 'user',
+        content: `Role: ${opts.roleTitle}\nMatch reasoning: ${opts.matchReasoning}\n\nCandidate (structured):\n${JSON.stringify({
+          headline: opts.candidate.headline,
+          outcomes: opts.candidate.outcomes,
+          skills: opts.candidate.skills,
+          tools: opts.candidate.tools,
+          rolesFit: opts.candidate.rolesFit,
+          workContext: opts.candidate.workContext,
+        }, null, 2)}`,
+      },
+    ],
+    thinking: { type: 'disabled' },
+  })
+  const parsed = extractJson(completion.choices[0]?.message?.content ?? '') as Partial<RedactedProfile>
+  return {
+    oceanId: String(parsed.oceanId ?? 'Oceans Diver').slice(0, 80),
+    markdown: String(parsed.markdown ?? '').slice(0, 3000),
+  }
+}
+
+// ---------------- Step 7: Match type + price range ----------------
+// Determines port | lagoon | market and a suggested monthly price band.
+
+export function computeMatchType(opts: {
+  candidatePool: string // port | lagoon
+  isExternal?: boolean // true if this result came from external SL scrape (step 4)
+}): string {
+  if (opts.isExternal) return 'market'
+  return opts.candidatePool === 'lagoon' ? 'lagoon' : 'port'
+}
+
+export function computePriceRange(opts: {
+  seniority: string // from the job categorization
+  matchType: string // port | lagoon | market
+}): string {
+  // Base monthly USD bands by seniority (Oceans' typical placement pricing).
+  const bands: Record<string, [number, number]> = {
+    junior: [1500, 2200],
+    mid: [2200, 3200],
+    senior: [3200, 4500],
+    lead: [4500, 6000],
+    exec: [6000, 8500],
+  }
+  const [lo, hi] = bands[opts.seniority] ?? bands.mid
+  // Market hires carry a sourcing premium.
+  const premium = opts.matchType === 'market' ? 500 : 0
+  const fmt = (n: number) => `$${(n + premium).toLocaleString()}`
+  return `${fmt(lo)}-${fmt(hi)}/mo`
 }

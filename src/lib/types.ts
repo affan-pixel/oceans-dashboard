@@ -29,11 +29,16 @@ export interface MatchResultDTO {
   candidateName: string;
   candidateHeadline: string;
   candidateLocation: string;
+  candidatePool?: string;      // port | lagoon (from the candidate)
   score: number;               // 0-100
   rank: number;
   reasoning: string;           // one paragraph why they match
   strengths: string[];
   gaps: string[];
+  matchType: string;           // port | lagoon | market (step 7)
+  priceRangeUsd: string | null;
+  fitStatus: string;           // pending | approved | rejected (step 5)
+  candidateRedactedProfile?: string | null; // redacted markdown if generated
 }
 
 export interface MatchDTO {
@@ -69,6 +74,8 @@ export interface CandidateDTO {
   searchBlob: string;
   status: string;
   tags: string[];
+  pool: string;              // port | lagoon
+  redactedProfile: string | null; // Oceans-branded redacted markdown (step 6)
   createdAt: string;
   updatedAt: string;
 }
@@ -137,6 +144,23 @@ export interface ReferrerDTO {
   isSample?: boolean; // true when this is labeled sample data (real lookup unavailable)
 }
 
+// ---- Steps 5 + 8: Approval requests (Oceans team fit-check + leadership sign-off) ----
+export interface ApprovalRequestDTO {
+  id: string;
+  matchId: string;
+  matchResultId: string | null;
+  candidateId: string | null;
+  stage: string;        // profile_review | leadership
+  channel: string;      // in_app | slack
+  slackChannel: string | null;
+  slackMessageTs: string | null;
+  status: string;       // pending | approved | rejected
+  decidedBy: string | null;
+  decidedAt: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
 export interface ScrapedJobDTO {
   id: string;
   jobTargetId: string;
@@ -165,6 +189,10 @@ export interface ScrapedJobDTO {
   outreachStatus: string | null;
   outreachContent: string | null;
   outreachSentAt: string | null;
+  // Step 2: Categorization
+  seniority: string | null;
+  skillsRequired: string[];
+  timezone: string | null;
   createdAt: string;
 }
 

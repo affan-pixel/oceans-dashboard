@@ -4,6 +4,7 @@
 
 import type {
   ActivityDTO,
+  ApprovalRequestDTO,
   BriefDTO,
   CandidateDTO,
   ExternalProspectDTO,
@@ -78,6 +79,8 @@ export function toCandidateDTO(c: {
   searchBlob: string
   status: string
   tags: string
+  pool: string
+  redactedProfile: string | null
   createdAt: Date
   updatedAt: Date
 }): CandidateDTO {
@@ -100,6 +103,8 @@ export function toCandidateDTO(c: {
     searchBlob: c.searchBlob,
     status: c.status,
     tags: parseArray(c.tags),
+    pool: c.pool,
+    redactedProfile: c.redactedProfile,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   }
@@ -208,6 +213,9 @@ export function toScrapedJobDTO(s: {
   outreachStatus: string | null
   outreachContent: string | null
   outreachSentAt: Date | null
+  seniority: string | null
+  skillsRequired: string
+  timezone: string | null
   createdAt: Date
 }): ScrapedJobDTO {
   return {
@@ -235,6 +243,9 @@ export function toScrapedJobDTO(s: {
     outreachStatus: s.outreachStatus,
     outreachContent: s.outreachContent,
     outreachSentAt: s.outreachSentAt ? s.outreachSentAt.toISOString() : null,
+    seniority: s.seniority,
+    skillsRequired: parseArray(s.skillsRequired),
+    timezone: s.timezone,
     createdAt: s.createdAt.toISOString(),
   }
 }
@@ -268,10 +279,15 @@ export function toMatchResultDTO(
     strengths: string
     gaps: string
     rank: number
+    matchType: string
+    priceRangeUsd: string | null
+    fitStatus: string
     candidate: {
       name: string
       headline: string
       location: string
+      pool?: string
+      redactedProfile?: string | null
     }
   }
 ): MatchResultDTO {
@@ -281,11 +297,48 @@ export function toMatchResultDTO(
     candidateName: r.candidate.name,
     candidateHeadline: r.candidate.headline,
     candidateLocation: r.candidate.location,
+    candidatePool: r.candidate.pool,
     score: r.score,
     rank: r.rank,
     reasoning: r.reasoning,
     strengths: parseArray(r.strengths),
     gaps: parseArray(r.gaps),
+    matchType: r.matchType,
+    priceRangeUsd: r.priceRangeUsd,
+    fitStatus: r.fitStatus,
+    candidateRedactedProfile: r.candidate.redactedProfile,
+  }
+}
+
+export function toApprovalRequestDTO(a: {
+  id: string
+  matchId: string
+  matchResultId: string | null
+  candidateId: string | null
+  stage: string
+  channel: string
+  slackChannel: string | null
+  slackMessageTs: string | null
+  status: string
+  decidedBy: string | null
+  decidedAt: Date | null
+  note: string | null
+  createdAt: Date
+}): ApprovalRequestDTO {
+  return {
+    id: a.id,
+    matchId: a.matchId,
+    matchResultId: a.matchResultId,
+    candidateId: a.candidateId,
+    stage: a.stage,
+    channel: a.channel,
+    slackChannel: a.slackChannel,
+    slackMessageTs: a.slackMessageTs,
+    status: a.status,
+    decidedBy: a.decidedBy,
+    decidedAt: a.decidedAt ? a.decidedAt.toISOString() : null,
+    note: a.note,
+    createdAt: a.createdAt.toISOString(),
   }
 }
 

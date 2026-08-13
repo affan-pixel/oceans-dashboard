@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { toJobTargetDTO, toScrapedJobDTO } from '@/lib/mappers'
-import { scrapeJobsForIcp } from '@/lib/ai'
+import { scrapeJobsForIcp, categorizeJob } from '@/lib/ai'
 import { isConnected, getApiKey, markSynced } from '@/lib/integrations/db'
 import { scrapeJobsWithApify } from '@/lib/integrations/apify'
 import { scrapeJobsWithAgentReach } from '@/lib/integrations/agent-reach'
@@ -93,10 +93,17 @@ export async function POST(_request: Request, { params }: Params) {
       source = 'simulated'
     }
 
-    // Persist scraped jobs (append — don't delete previous, so we keep history)
+    // Persist scraped jobs (append — don't delete previous, so we keep history).
+    // Categorize each (step 2: seniority / skills / timezone) before insert.
     if (jobs.length > 0) {
+      const categorized = await Promise.all(
+        jobs.slice(0, 8).map(async (j) => {
+          const cat = await categorizeJob(j.title, j.snippet)
+          return { ...j, ...cat }
+        })
+      )
       await db.scrapedJob.createMany({
-        data: jobs.map((j) => ({
+        data: categorized.map((j) => ({
           jobTargetId: id,
           title: j.title,
           company: j.company,
@@ -109,6 +116,9 @@ export async function POST(_request: Request, { params }: Params) {
           fitReason: j.fitReason,
           postedAt: j.postedAt,
           scrapeSource: source,
+          seniority: j.seniority,
+          skillsRequired: JSON.stringify(j.skills),
+          timezone: j.timezone,
           status: 'new',
         })),
       })

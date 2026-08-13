@@ -355,7 +355,7 @@ export async function seedData(prisma: typeof db) {
 
   // Candidates (structured fields left empty here — structured via AI when added through the UI;
   // for the seed we provide a pre-structured blob so matching works out of the box)
-  for (const c of CANDIDATES) {
+  for (const [idx, c] of CANDIDATES.entries()) {
     // Lightweight heuristic pre-structuring so the matcher has something to work with
     // without calling the LLM at seed time. The UI "Re-structure with AI" button calls
     // the real parseJD / structureCandidate flow.
@@ -366,6 +366,8 @@ export async function seedData(prisma: typeof db) {
           .filter((t) => lower.includes(t.toLowerCase()))
       )
     )
+    // Step 3 taxonomy: alternate port (available now) / lagoon (in pool, not immediately).
+    const pool = idx % 2 === 0 ? 'port' : 'lagoon'
     await prisma.candidate.create({
       data: {
         name: c.name,
@@ -385,6 +387,7 @@ export async function seedData(prisma: typeof db) {
         searchBlob: c.raw.toLowerCase(),
         status: 'active',
         tags: j(c.tags),
+        pool,
       },
     })
   }

@@ -1,10 +1,21 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { toMatchDTO, toMatchResultDTO, toExternalProspectDTO } from '@/lib/mappers'
-import { matchCandidates, type CandidateForMatch } from '@/lib/ai'
+import { matchCandidates, computeMatchType, computePriceRange, type CandidateForMatch } from '@/lib/ai'
 import type { StructuredJD } from '@/lib/types'
 
 type Params = { params: Promise<{ id: string }> }
+
+// Quick title-based seniority inference for pricing (the LLM categorizeJob is
+// more accurate but runs on scraped jobs, not JD titles).
+function inferSeniority(title: string): string {
+  const t = title.toLowerCase()
+  if (/(vp|chief|cto|ceo|coo|cfo|head of|director)/.test(t)) return 'exec'
+  if (/(lead|principal|staff)/.test(t)) return 'lead'
+  if (/(senior|sr\.?)/.test(t)) return 'senior'
+  if (/(junior|jr\.?|intern|entry)/.test(t)) return 'junior'
+  return 'mid'
+}
 
 function parseArray(v: unknown): string[] {
   if (typeof v !== 'string' || !v) return []
@@ -84,15 +95,26 @@ export async function POST(_request: Request, { params }: Params) {
 
       if (validRanked.length > 0) {
         await tx.matchResult.createMany({
-          data: validRanked.map((r, idx) => ({
-            matchId: created.id,
-            candidateId: r.candidateId,
-            score: r.score,
-            reasoning: r.reasoning,
-            strengths: JSON.stringify(r.strengths),
-            gaps: JSON.stringify(r.gaps),
-            rank: idx + 1,
-          })),
+          data: validRanked.map((r, idx) => {
+            const cand = candidateById.get(r.candidateId)!
+            const matchType = computeMatchType({ candidatePool: cand.pool })
+            const priceRangeUsd = computePriceRange({
+              seniority: inferSeniority(jd.title),
+              matchType,
+            })
+            return {
+              matchId: created.id,
+              candidateId: r.candidateId,
+              score: r.score,
+              reasoning: r.reasoning,
+              strengths: JSON.stringify(r.strengths),
+              gaps: JSON.stringify(r.gaps),
+              rank: idx + 1,
+              matchType,
+              priceRangeUsd,
+              fitStatus: 'pending',
+            }
+          }),
         })
       }
 
@@ -121,7 +143,7 @@ export async function POST(_request: Request, { params }: Params) {
         jobDescription: { select: { title: true, company: true } },
         results: {
           include: {
-            candidate: { select: { name: true, headline: true, location: true } },
+            candidate: { select: { name: true, headline: true, location: true, pool: true, redactedProfile: true } },
           },
           orderBy: { rank: 'asc' },
         },

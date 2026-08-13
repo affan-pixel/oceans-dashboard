@@ -9,7 +9,7 @@ const globalForPrisma = globalThis as unknown as {
 // `bun run db:push` adds new models). Without this, the dev server keeps a
 // stale PrismaClient instance that doesn't know about new models like
 // JobTarget / Brief.
-const SCHEMA_VERSION = 'v5-dm-sample-flag'
+const SCHEMA_VERSION = 'v6-workflow-taxonomy-approvals'
 
 if (
   globalForPrisma.prisma &&

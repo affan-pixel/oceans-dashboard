@@ -243,6 +243,111 @@ export function useScrapeExternal() {
   })
 }
 
+// ---- Workflow actions (Faahika's 9-step flow) ----
+
+// Step 5: Oceans team profile-fit approve/reject
+export function useDecideFit() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ resultId, decision }: { resultId: string; decision: 'approved' | 'rejected' }) =>
+      http<{ id: string; fitStatus: string }>(`/api/match-results/${resultId}/decide-fit`, {
+        method: 'POST',
+        body: JSON.stringify({ decision }),
+      }),
+    onSuccess: (data) => {
+      toast.success(`Profile-fit ${data.fitStatus}`)
+      qc.invalidateQueries({ queryKey: ['matches'] })
+      qc.invalidateQueries({ queryKey: ['match'] })
+    },
+    onError: (err: Error) => toast.error('Failed to record decision', { description: err.message }),
+  })
+}
+
+// Step 6: generate Oceans-branded redacted profile
+export function useGenerateRedactedProfile() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (resultId: string) =>
+      http<{ candidateId: string; oceanId: string; markdown: string }>(`/api/match-results/${resultId}/redacted`, {
+        method: 'POST',
+      }),
+    onSuccess: (data) => {
+      toast.success('Redacted profile generated', { description: data.oceanId })
+      qc.invalidateQueries({ queryKey: ['matches'] })
+      qc.invalidateQueries({ queryKey: ['match'] })
+      qc.invalidateQueries({ queryKey: ['candidates'] })
+    },
+    onError: (err: Error) => toast.error('Failed to generate profile', { description: err.message }),
+  })
+}
+
+// Step 7: notify Slack (drafts in-app when no token)
+export function useNotifySlack() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, matchResultId }: { matchId: string; matchResultId: string }) =>
+      http<{ ok: boolean; drafted?: boolean; channel?: string; message?: string }>(
+        `/api/matches/${matchId}/notify-slack`,
+        { method: 'POST', body: JSON.stringify({ matchResultId }) }
+      ),
+    onSuccess: (data) => {
+      if (data.drafted) {
+        toast.success('Slack message drafted', { description: 'Add SLACK_BOT_TOKEN to post for real.' })
+      } else {
+        toast.success('Slack notified', { description: `Posted to ${data.channel ?? ''}` })
+      }
+      qc.invalidateQueries({ queryKey: ['matches'] })
+    },
+    onError: (err: Error) => toast.error('Slack notify failed', { description: err.message }),
+  })
+}
+
+// Step 8: request leadership approval
+export function useRequestLeadership() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, matchResultId }: { matchId: string; matchResultId: string }) =>
+      http<{ ok: boolean; status: string }>(`/api/matches/${matchId}/request-leadership`, {
+        method: 'POST',
+        body: JSON.stringify({ matchResultId }),
+      }),
+    onSuccess: () => {
+      toast.success('Leadership approval requested')
+      qc.invalidateQueries({ queryKey: ['matches'] })
+    },
+    onError: (err: Error) => toast.error('Failed to request approval', { description: err.message }),
+  })
+}
+
+// Step 9: send prospect email via HubSpot (drafts when no token)
+export function useSendProspectEmail() {
+  return useMutation({
+    mutationFn: ({
+      matchId,
+      to,
+      subject,
+      body,
+    }: {
+      matchId: string
+      to: string
+      subject: string
+      body: string
+    }) =>
+      http<{ ok: boolean; drafted?: boolean; message?: string }>(`/api/matches/${matchId}/send-email`, {
+        method: 'POST',
+        body: JSON.stringify({ to, subject, body }),
+      }),
+    onSuccess: (data) => {
+      if (data.drafted) {
+        toast.success('Email drafted', { description: 'Add HUBSPOT_ACCESS_TOKEN to send for real.' })
+      } else {
+        toast.success('Email sent via HubSpot')
+      }
+    },
+    onError: (err: Error) => toast.error('Failed to send email', { description: err.message }),
+  })
+}
+
 // Update an external prospect's status (reviewed | promoted | rejected)
 export function useUpdateProspect() {
   const qc = useQueryClient()
