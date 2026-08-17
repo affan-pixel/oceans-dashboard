@@ -16,6 +16,11 @@ import type {
 
 let _zai: Awaited<ReturnType<typeof ZAI.create>> | null = null
 
+// Model sent with every LLM call. The API returns a bare {"error":{"code":"500"}}
+// (HTTP 200, no choices) when `model` is omitted, so it must always be present.
+// Override via ZAI_MODEL without touching code.
+const LLM_MODEL = process.env.ZAI_MODEL?.trim() || 'glm-4.6'
+
 // The z-ai-web-dev-sdk reads config from a .z-ai-config file. For Railway / any
 // host where keys come in as env vars, we materialize that file from ZAI_API_KEY
 // + ZAI_BASE_URL on first use. If a .z-ai-config already exists (local dev), it
@@ -82,6 +87,36 @@ function asStringArray(v: unknown): string[] {
   return []
 }
 
+// Classify why the LLM path failed so fallback summaries tell the truth.
+// A missing key and an empty Z.ai balance otherwise look identical
+// ("LLM not configured") and cost a confusing debugging round.
+export function llmDownReason(err: unknown): string {
+  if (!process.env.ZAI_API_KEY?.trim()) {
+    return 'LLM not configured — set ZAI_API_KEY'
+  }
+  const msg = err instanceof Error ? err.message : String(err)
+  if (/insufficient balance|recharge|1113/i.test(msg)) {
+    return 'Z.ai account balance is empty — recharge at z.ai (API console → Billing)'
+  }
+  return `LLM call failed: ${msg.slice(0, 200)}`
+}
+
+// The SDK resolves (does not throw) when the API returns an error body — e.g.
+// code 1113 "Insufficient balance" — which surfaces downstream as `choices`
+// being undefined. Route all completion reads through this helper so API
+// errors become real Errors carrying the API's own message.
+function completionText(completion: unknown): string {
+  const c = completion as {
+    error?: { code?: string | number; message?: string }
+    choices?: Array<{ message?: { content?: string } }>
+  }
+  if (c?.error) {
+    const detail = c.error.message ?? `code ${c.error.code ?? 'unknown'}`
+    throw new Error(`Z.ai API error: ${detail}`)
+  }
+  return c.choices?.[0]?.message?.content ?? ''
+}
+
 // ---------------- Agent 2 / Step 1: JD Parsing ----------------
 
 const JD_SYSTEM_PROMPT = `You are the JD parser for Ocean Talent, a headhunting firm placing Sri Lankan talent with companies in the USA, Europe, and Australia.
@@ -102,7 +137,7 @@ Return STRICT JSON only, no prose, with this exact shape:
 
 export async function parseJD(rawText: string): Promise<StructuredJD> {
   const zai = await getZai()
-  const completion = await zai.chat.completions.create({
+  const completion = await zai.chat.completions.create({ model: LLM_MODEL,
     messages: [
       { role: 'assistant', content: JD_SYSTEM_PROMPT },
       {
@@ -113,7 +148,7 @@ export async function parseJD(rawText: string): Promise<StructuredJD> {
     thinking: { type: 'disabled' },
   })
 
-  const content = completion.choices[0]?.message?.content ?? ''
+  const content = completionText(completion)
   const parsed = extractJson(content) as Partial<StructuredJD>
 
   const outcomes = asStringArray(parsed.outcomes)
@@ -166,7 +201,7 @@ Return STRICT JSON only, no prose, with this exact shape:
 
 export async function structureCandidate(rawProfile: string): Promise<StructuredCandidate> {
   const zai = await getZai()
-  const completion = await zai.chat.completions.create({
+  const completion = await zai.chat.completions.create({ model: LLM_MODEL,
     messages: [
       { role: 'assistant', content: CANDIDATE_SYSTEM_PROMPT },
       {
@@ -177,7 +212,7 @@ export async function structureCandidate(rawProfile: string): Promise<Structured
     thinking: { type: 'disabled' },
   })
 
-  const content = completion.choices[0]?.message?.content ?? ''
+  const content = completionText(completion)
   const parsed = extractJson(content) as Partial<StructuredCandidate>
 
   const outcomes = asStringArray(parsed.outcomes)
@@ -281,7 +316,7 @@ export async function matchCandidates(
 
   try {
     const zai = await getZai()
-    const completion = await zai.chat.completions.create({
+    const completion = await zai.chat.completions.create({ model: LLM_MODEL,
       messages: [
         { role: 'assistant', content: MATCH_SYSTEM_PROMPT },
         {
@@ -292,7 +327,7 @@ export async function matchCandidates(
       thinking: { type: 'disabled' },
     })
 
-    const content = completion.choices[0]?.message?.content ?? ''
+    const content = completionText(completion)
     const parsed = extractJson(content) as {
       summary?: string
       ranked?: Array<{
@@ -318,11 +353,14 @@ export async function matchCandidates(
       : []
 
     return { summary, ranked }
-  } catch {
-    // LLM unavailable (no key) — heuristic sample ranking so the workflow is demoable.
-    // Scores candidates by keyword overlap between JD skills/outcomes and candidate
-    // skills/tools/roles. Clearly lower quality than the LLM but never blocks the flow.
-    return sampleMatch(jd, candidates)
+  } catch (err) {
+    // LLM unavailable (no key, empty balance, API error) — heuristic sample
+    // ranking so the workflow is demoable. Scores candidates by keyword overlap
+    // between JD skills/outcomes and candidate skills/tools/roles. Clearly lower
+    // quality than the LLM but never blocks the flow.
+    const reason = llmDownReason(err)
+    console.warn('[ai] matchCandidates fell back to sample ranking:', reason)
+    return sampleMatch(jd, candidates, reason)
   }
 }
 
@@ -330,7 +368,8 @@ export async function matchCandidates(
 // shortlist based on keyword overlap so the full workflow can be demonstrated.
 function sampleMatch(
   jd: StructuredJD,
-  candidates: CandidateForMatch[]
+  candidates: CandidateForMatch[],
+  reason = 'LLM not configured — set ZAI_API_KEY'
 ): { summary: string; ranked: Array<{ candidateId: string; score: number; reasoning: string; strengths: string[]; gaps: string[] }> } {
   const jdKeywords = [
     ...jd.mandatorySkills,
@@ -352,11 +391,11 @@ function sampleMatch(
   scored.sort((a, b) => b.score - a.score)
 
   return {
-    summary: '(Sample shortlist — LLM not configured. Add ZAI_API_KEY for real semantic matching.)',
+    summary: `(Sample shortlist — ${reason})`,
     ranked: scored.slice(0, 5).map(({ candidate, score, hits }) => ({
       candidateId: candidate.id,
       score,
-      reasoning: `(Sample match — LLM not configured.) ${candidate.name} (${candidate.headline}) shows overlap on: ${hits.slice(0, 5).join(', ') || 'general profile fit'}.`,
+      reasoning: `(Sample match — ${reason}) ${candidate.name} (${candidate.headline}) shows overlap on: ${hits.slice(0, 5).join(', ') || 'general profile fit'}.`,
       strengths: hits.slice(0, 3).length > 0 ? hits.slice(0, 3) : ['Relevant role family'],
       gaps: ['Run with an LLM key for verified outcome-based fit'],
     })),
@@ -373,7 +412,7 @@ export async function draftOutreachEmail(opts: {
   role: string
 }): Promise<string> {
   const zai = await getZai()
-  const completion = await zai.chat.completions.create({
+  const completion = await zai.chat.completions.create({ model: LLM_MODEL,
     messages: [
       {
         role: 'assistant',
@@ -391,7 +430,7 @@ Reference the signal in the first sentence. Connect it to Oceans' track record o
     ],
     thinking: { type: 'disabled' },
   })
-  return (completion.choices[0]?.message?.content ?? '').trim()
+  return (completionText(completion)).trim()
 }
 
 // ---------------- Agent 2 / Step 4 (supplement): External Prospect Scraping ----------------
@@ -452,7 +491,7 @@ export async function scrapeExternalProspects(
     2
   )
 
-  const completion = await zai.chat.completions.create({
+  const completion = await zai.chat.completions.create({ model: LLM_MODEL,
     messages: [
       { role: 'assistant', content: SCRAPE_SYSTEM_PROMPT },
       {
@@ -463,7 +502,7 @@ export async function scrapeExternalProspects(
     thinking: { type: 'disabled' },
   })
 
-  const content = completion.choices[0]?.message?.content ?? ''
+  const content = completionText(completion)
   const parsed = extractJson(content) as { prospects?: ScrapedProspect[] }
   if (!Array.isArray(parsed.prospects)) return []
   return parsed.prospects
@@ -571,7 +610,7 @@ export async function scrapeJobsForIcp(icp: ScrapedJobInput): Promise<ScrapedJob
     2
   )
 
-  const completion = await zai.chat.completions.create({
+  const completion = await zai.chat.completions.create({ model: LLM_MODEL,
     messages: [
       { role: 'assistant', content: SCRAPE_JOBS_SYSTEM_PROMPT },
       {
@@ -582,7 +621,7 @@ export async function scrapeJobsForIcp(icp: ScrapedJobInput): Promise<ScrapedJob
     thinking: { type: 'disabled' },
   })
 
-  const content = completion.choices[0]?.message?.content ?? ''
+  const content = completionText(completion)
   const parsed = extractJson(content) as { jobs?: ScrapedJobOutput[] }
   if (!Array.isArray(parsed.jobs)) return []
   return parsed.jobs
@@ -724,7 +763,7 @@ export async function findDecisionMaker(opts: {
   let parsed: Partial<DecisionMakerSuggestion>
   try {
     const zai = await getZai()
-    const completion = await zai.chat.completions.create({
+    const completion = await zai.chat.completions.create({ model: LLM_MODEL,
       messages: [
         { role: 'assistant', content: DM_SYSTEM_PROMPT },
         {
@@ -734,7 +773,7 @@ export async function findDecisionMaker(opts: {
       ],
       thinking: { type: 'disabled' },
     })
-    const content = completion.choices[0]?.message?.content ?? ''
+    const content = completionText(completion)
     parsed = extractJson(content) as Partial<DecisionMakerSuggestion>
   } catch {
     // LLM unavailable (no key) or errored → labeled sample.
@@ -808,7 +847,7 @@ export async function findReferrers(opts: {
   let parsed: { referrers?: Array<Record<string, unknown>> }
   try {
     const zai = await getZai()
-    const completion = await zai.chat.completions.create({
+    const completion = await zai.chat.completions.create({ model: LLM_MODEL,
       messages: [
         { role: 'assistant', content: REFERRERS_SYSTEM_PROMPT },
         {
@@ -818,7 +857,7 @@ export async function findReferrers(opts: {
       ],
       thinking: { type: 'disabled' },
     })
-    const content = completion.choices[0]?.message?.content ?? ''
+    const content = completionText(completion)
     parsed = extractJson(content) as { referrers?: Array<Record<string, unknown>> }
   } catch {
     // LLM unavailable (no key) or errored → labeled samples.
@@ -865,14 +904,14 @@ Return STRICT JSON only: {"seniority":"...","skills":["..."],"timezone":"..."}`
 export async function categorizeJob(title: string, snippet: string): Promise<JobCategory> {
   try {
     const zai = await getZai()
-    const completion = await zai.chat.completions.create({
+    const completion = await zai.chat.completions.create({ model: LLM_MODEL,
       messages: [
         { role: 'assistant', content: CATEGORIZE_PROMPT },
         { role: 'user', content: `Title: ${title}\nDescription: ${snippet.slice(0, 800)}` },
       ],
       thinking: { type: 'disabled' },
     })
-    const parsed = extractJson(completion.choices[0]?.message?.content ?? '') as Partial<JobCategory>
+    const parsed = extractJson(completionText(completion)) as Partial<JobCategory>
     const seniority = (['junior', 'mid', 'senior', 'lead', 'exec'].includes(String(parsed.seniority))
       ? String(parsed.seniority)
       : 'mid') as string
@@ -911,7 +950,7 @@ export async function generateRedactedProfile(opts: {
   matchReasoning: string
 }): Promise<RedactedProfile> {
   const zai = await getZai()
-  const completion = await zai.chat.completions.create({
+  const completion = await zai.chat.completions.create({ model: LLM_MODEL,
     messages: [
       { role: 'assistant', content: REDACT_PROMPT },
       {
@@ -928,7 +967,7 @@ export async function generateRedactedProfile(opts: {
     ],
     thinking: { type: 'disabled' },
   })
-  const parsed = extractJson(completion.choices[0]?.message?.content ?? '') as Partial<RedactedProfile>
+  const parsed = extractJson(completionText(completion)) as Partial<RedactedProfile>
   return {
     oceanId: String(parsed.oceanId ?? 'Oceans Diver').slice(0, 80),
     markdown: String(parsed.markdown ?? '').slice(0, 3000),
