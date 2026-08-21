@@ -565,6 +565,10 @@ export interface ScrapedJobOutput {
   snippet: string
   fitReason: string
   postedAt: string
+  // optional poster info (when the source provides it, e.g. Apify LinkedIn actor)
+  postedByName?: string
+  postedByTitle?: string
+  postedByUrl?: string
 }
 
 const SCRAPE_JOBS_SYSTEM_PROMPT = `You are the job-scraper agent for Oceans, a headhunting firm placing Sri Lankan talent (Divers) with companies in the USA, Europe, and Australia.
@@ -1002,4 +1006,52 @@ export function computePriceRange(opts: {
   const premium = opts.matchType === 'market' ? 500 : 0
   const fmt = (n: number) => `$${(n + premium).toLocaleString()}`
   return `${fmt(lo)}-${fmt(hi)}/mo`
+}
+
+// ---------------- Agent 1: Job poster detection ----------------
+// Identifies WHO at the company posted the role (HR / recruiter / founder / CEO)
+// from the fetched posting page. A founder/CEO posting personally is a strong
+// lead signal — faster decision path for Oceans.
+
+export interface JobPoster {
+  name: string
+  title: string
+  url: string
+  kind: 'hr' | 'founder' | 'ceo' | 'recruiter' | 'other'
+}
+
+const POSTER_PROMPT = `You identify who posted a job. You receive the fetched job-posting page (markdown). Look for a "posted by", recruiter contact, or hiring team section. Identify:
+- name: the person who posted the role (empty string if not visible)
+- title: their title at the company
+- url: their LinkedIn URL if visible
+- kind: classify as "hr" | "recruiter" | "founder" | "ceo" | "other" based on their title (Founder/Co-founder → founder; CEO/CTO/COO/Chief → ceo; Recruiter/Talent → recruiter; HR/People → hr; else other)
+Do NOT invent. If nothing is visible, return empty strings and kind "other".
+Return STRICT JSON: {"name":"","title":"","url":"","kind":"other"}`
+
+export async function findJobPoster(opts: {
+  company: string
+  roleTitle: string
+  pageText: string
+}): Promise<JobPoster> {
+  const zai = await getZai()
+  const completion = await zai.chat.completions.create({
+    messages: [
+      { role: 'assistant', content: POSTER_PROMPT },
+      {
+        role: 'user',
+        content: `Company: ${opts.company}\nRole: ${opts.roleTitle}\n\n--- PAGE ---\n${opts.pageText.slice(0, 6000)}\n--- END ---\n\nWho posted this role? Strict JSON.`,
+      },
+    ],
+    thinking: { type: 'disabled' },
+  })
+  const parsed = extractJson(completion.choices[0]?.message?.content ?? '') as Partial<JobPoster>
+  const kind = (['hr', 'founder', 'ceo', 'recruiter', 'other'].includes(String(parsed.kind))
+    ? String(parsed.kind)
+    : 'other') as JobPoster['kind']
+  return {
+    name: String(parsed.name ?? '').slice(0, 120),
+    title: String(parsed.title ?? '').slice(0, 200),
+    url: String(parsed.url ?? '').slice(0, 500),
+    kind,
+  }
 }

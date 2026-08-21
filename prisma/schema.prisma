@@ -171,6 +171,25 @@ model ScrapedJob {
   skillsRequired String   @default("[]") // JSON array of key skills extracted from the posting
   timezone       String?  // inferred working timezone e.g. "US-East" | "EU" | "APAC-overlap" | "Global"
 
+  // ---- Agent 1: job persistence tracking ----
+  // A job seen repeatedly over weeks/months = company can't fill it = hot lead.
+  firstSeenAt DateTime @default(now()) // when we first scraped it
+  lastSeenAt  DateTime @default(now()) // last scrape/recheck that confirmed it live
+  timesSeen   Int      @default(1)     // how many scrapes/rechecks confirmed it
+  ageBand     String   @default("fresh") // fresh(<24h) | week | month | quarter | stuck(3mo+)
+  stillLive   Boolean  @default(true)  // false once a recheck finds the posting gone
+
+  // ---- Agent 1: who posted it ----
+  postedByName   String? // the person who posted the role (HR / founder / CEO)
+  postedByTitle  String? // their title at the company
+  postedByUrl    String? // their LinkedIn profile
+  postedByKind   String? // hr | founder | ceo | recruiter | other
+  isOnCompanyPage Boolean @default(false) // also posted on the company's own careers page
+
+  // ---- Agent 1: lead scoring (scaffold — method list pending from user) ----
+  leadScore   Int    @default(0)  // 0-100
+  leadSignals String @default("[]") // JSON array of { signal, points } that produced the score
+
   createdAt    DateTime @default(now())
 }
 

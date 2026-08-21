@@ -7,7 +7,7 @@
 //   2. Register it in REGISTRY below
 //   3. (optional) wire it into a flow via getIntegration() + isConnected()
 
-export type Provider = 'apify' | 'apollo' | 'lemlist' | 'hubspot' | 'clay' | 'origami' | 'firecrawl' | 'slack' | 'workable'
+export type Provider = 'apify' | 'apollo' | 'lemlist' | 'hubspot' | 'clay' | 'origami' | 'firecrawl' | 'slack' | 'workable' | 'instantly'
 
 export interface IntegrationConfig {
   provider: Provider
@@ -267,8 +267,31 @@ export const REGISTRY: Record<Provider, IntegrationAdapter> = {
       return { ok: true, message: 'Workable token saved (validated on first sync).' }
     },
   },
+
+  instantly: {
+    provider: 'instantly',
+    label: 'Instantly',
+    description:
+      'Cold-email sequencing — pushes scraped-job leads into an Instantly campaign (unlimited email sends).',
+    docsUrl: 'https://developer.instantly.ai/',
+    keyLabel: 'API Key',
+    keyPlaceholder: 'xxxxxxxxxxxxxxxxxxxxxxxx',
+    category: 'outreach',
+    capabilities: ['outreach-send'],
+    test: async (apiKey: string): Promise<TestResult> => {
+      try {
+        const res = await fetch(`https://api.instantly.ai/api/v1/campaign/get/all?apiKey=${encodeURIComponent(apiKey)}`, {
+          signal: AbortSignal.timeout(10_000),
+        })
+        if (!res.ok) return { ok: false, message: `Instantly rejected the key (HTTP ${res.status}).` }
+        return { ok: true, message: 'Connected to Instantly.', accountInfo: 'Key accepted.' }
+      } catch {
+        return { ok: false, message: 'Could not reach Instantly. Check the key and try again.' }
+      }
+    },
+  },
 }
 
 export const ALL_PROVIDERS: Provider[] = [
-  'apify', 'origami', 'firecrawl', 'apollo', 'clay', 'workable', 'slack', 'lemlist', 'hubspot',
+  'apify', 'origami', 'firecrawl', 'apollo', 'clay', 'workable', 'slack', 'lemlist', 'hubspot', 'instantly',
 ]

@@ -216,6 +216,17 @@ export function toScrapedJobDTO(s: {
   seniority: string | null
   skillsRequired: string
   timezone: string | null
+  firstSeenAt: Date
+  lastSeenAt: Date
+  timesSeen: number
+  ageBand: string
+  stillLive: boolean
+  postedByName: string | null
+  postedByTitle: string | null
+  postedByUrl: string | null
+  postedByKind: string | null
+  isOnCompanyPage: boolean
+  leadScore: number
   createdAt: Date
 }): ScrapedJobDTO {
   return {
@@ -246,6 +257,17 @@ export function toScrapedJobDTO(s: {
     seniority: s.seniority,
     skillsRequired: parseArray(s.skillsRequired),
     timezone: s.timezone,
+    firstSeenAt: s.firstSeenAt.toISOString(),
+    lastSeenAt: s.lastSeenAt.toISOString(),
+    timesSeen: s.timesSeen,
+    ageBand: s.ageBand,
+    stillLive: s.stillLive,
+    postedByName: s.postedByName,
+    postedByTitle: s.postedByTitle,
+    postedByUrl: s.postedByUrl,
+    postedByKind: s.postedByKind,
+    isOnCompanyPage: s.isOnCompanyPage,
+    leadScore: s.leadScore,
     createdAt: s.createdAt.toISOString(),
   }
 }

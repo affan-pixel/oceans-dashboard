@@ -6,6 +6,7 @@ import { isConnected, getApiKey, markSynced } from '@/lib/integrations/db'
 import { scrapeJobsWithApify } from '@/lib/integrations/apify'
 import { scrapeJobsWithAgentReach } from '@/lib/integrations/agent-reach'
 import { env } from '@/lib/env'
+import { computeLeadScore, jobMatchKey } from '@/lib/agent1'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -97,35 +98,77 @@ export async function POST(_request: Request, { params }: Params) {
       source = 'simulated'
     }
 
-    // Persist scraped jobs (append — don't delete previous, so we keep history).
-    // Categorize each (step 2: seniority / skills / timezone) before insert.
+    // Persist scraped jobs with DEDUPE + AGE TRACKING:
+    //   - A job we've seen before (same company+title) updates lastSeenAt/timesSeen
+    //     instead of duplicating — that's how we know it's STILL open after 1w/1m/3m.
+    //   - Brand-new jobs get categorized (step 2) + lead-scored, then inserted.
+    let newCount = 0
+    let updatedCount = 0
     if (jobs.length > 0) {
-      const categorized = await Promise.all(
-        jobs.slice(0, 8).map(async (j) => {
-          const cat = await categorizeJob(j.title, j.snippet)
-          return { ...j, ...cat }
-        })
-      )
-      await db.scrapedJob.createMany({
-        data: categorized.map((j) => ({
-          jobTargetId: id,
-          title: j.title,
-          company: j.company,
-          location: j.location,
-          region: j.region,
-          salaryText: j.salaryText,
-          sourcePlatform: j.sourcePlatform,
-          sourceUrl: j.sourceUrl,
-          snippet: j.snippet,
-          fitReason: j.fitReason,
-          postedAt: j.postedAt,
-          scrapeSource: source,
-          seniority: j.seniority,
-          skillsRequired: JSON.stringify(j.skills),
-          timezone: j.timezone,
-          status: 'new',
-        })),
+      // Load this ICP's live jobs for dedupe matching.
+      const existing = await db.scrapedJob.findMany({
+        where: { jobTargetId: id, stillLive: true },
+        select: { id: true, company: true, title: true, timesSeen: true },
       })
+      const existingByKey = new Map(existing.map((e) => [jobMatchKey(e.company, e.title), e]))
+
+      for (const j of jobs.slice(0, 8)) {
+        const key = jobMatchKey(j.company, j.title)
+        const prior = existingByKey.get(key)
+
+        if (prior) {
+          // Seen again → still open. Bump tracking; keep original firstSeenAt/age.
+          const timesSeen = (prior.timesSeen ?? 1) + 1
+          await db.scrapedJob.update({
+            where: { id: prior.id },
+            data: { lastSeenAt: new Date(), timesSeen },
+          })
+          updatedCount++
+          continue
+        }
+
+        // Brand-new job → categorize + score, then insert.
+        const cat = await categorizeJob(j.title, j.snippet)
+        // Classify the poster from their title (founder/ceo = hot signal).
+        const pt = (j.postedByTitle ?? '').toLowerCase()
+        const postedByKind = !j.postedByName ? null
+          : /(founder|co-founder)/.test(pt) ? 'founder'
+          : /(ceo|cto|coo|cfo|chief)/.test(pt) ? 'ceo'
+          : /(recruiter|talent)/.test(pt) ? 'recruiter'
+          : /(hr|people)/.test(pt) ? 'hr'
+          : 'other'
+        const { score, signals } = computeLeadScore({
+          ageBand: 'fresh',
+          stillLive: true,
+          remoteOnly: icp.remoteOnly,
+          sourcePlatform: j.sourcePlatform,
+          seniority: cat.seniority,
+          postedByKind,
+        })
+        await db.scrapedJob.create({
+          data: {
+            jobTargetId: id,
+            title: j.title,
+            company: j.company,
+            location: j.location,
+            region: j.region,
+            salaryText: j.salaryText,
+            sourcePlatform: j.sourcePlatform,
+            sourceUrl: j.sourceUrl,
+            snippet: j.snippet,
+            fitReason: j.fitReason,
+            postedAt: j.postedAt,
+            scrapeSource: source,
+            seniority: cat.seniority,
+            skillsRequired: JSON.stringify(cat.skills),
+            timezone: cat.timezone,
+            status: 'new',
+            leadScore: score,
+            leadSignals: JSON.stringify(signals),
+          },
+        })
+        newCount++
+      }
     }
 
     await db.jobTarget.update({
@@ -137,7 +180,7 @@ export async function POST(_request: Request, { params }: Params) {
       data: {
         agent: 'customer_finder',
         type: 'jobs_scraped',
-        message: `Scraped ${jobs.length} jobs for ICP "${icp.name}" via ${source}.`,
+        message: `Scrape for ICP "${icp.name}" via ${source}: ${newCount} new, ${updatedCount} confirmed still open.`,
       },
     })
 

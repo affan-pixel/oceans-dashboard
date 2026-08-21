@@ -44,6 +44,12 @@ interface ApifyDatasetItem {
   dateText?: string
   engine?: string
   source?: string
+  // job poster fields (curious_coder actor)
+  jobPoster?: string
+  jobPosterUrl?: string
+  jobPosterTitle?: string
+  recruiter?: string
+  recruiterUrl?: string
 }
 
 /** Run an Apify actor synchronously and return its dataset items. */
@@ -117,6 +123,8 @@ export async function scrapeJobsWithApify(
       const title = firstString(item.title, item.jobTitle, item.position)
       const company = firstString(item.company, item.companyName)
       if (!title || !company) continue
+      const posterName = firstString(item.jobPoster, item.recruiter)
+      const posterUrl = firstString(item.jobPosterUrl, item.recruiterUrl)
       results.push({
         title: title.slice(0, 200),
         company: company.slice(0, 200),
@@ -126,8 +134,13 @@ export async function scrapeJobsWithApify(
         sourcePlatform: 'linkedin' as ScrapedJobOutput['sourcePlatform'],
         sourceUrl: firstString(item.url, item.link, item.jobUrl).slice(0, 500),
         snippet: firstString(item.description, item.jobDescription, item.snippet).replace(/<[^>]*>/g, '').slice(0, 500),
-        fitReason: `Matches ICP "${icp.name}" (${icp.roleTypes.slice(0, 2).join(', ')})`,
+        fitReason: posterName
+          ? `Matches ICP "${icp.name}" · posted by ${posterName}`
+          : `Matches ICP "${icp.name}" (${icp.roleTypes.slice(0, 2).join(', ')})`,
         postedAt: firstString(item.postedAt, item.date, item.dateText).slice(0, 50),
+        postedByName: posterName.slice(0, 120),
+        postedByTitle: firstString(item.jobPosterTitle).slice(0, 200),
+        postedByUrl: posterUrl.slice(0, 500),
       })
       if (results.length >= 8) break
     }

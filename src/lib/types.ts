@@ -193,6 +193,20 @@ export interface ScrapedJobDTO {
   seniority: string | null;
   skillsRequired: string[];
   timezone: string | null;
+  // Agent 1: persistence tracking
+  firstSeenAt: string;
+  lastSeenAt: string;
+  timesSeen: number;
+  ageBand: string;            // fresh | week | month | quarter | stuck
+  stillLive: boolean;
+  // Agent 1: who posted it
+  postedByName: string | null;
+  postedByTitle: string | null;
+  postedByUrl: string | null;
+  postedByKind: string | null; // hr | founder | ceo | recruiter | other
+  isOnCompanyPage: boolean;
+  // Agent 1: lead scoring
+  leadScore: number;
   createdAt: string;
 }
 

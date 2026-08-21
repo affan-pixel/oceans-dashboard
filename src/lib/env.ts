@@ -37,6 +37,8 @@ export const env = {
 
   // CRM + email
   hubspotAccessToken: b(process.env.HUBSPOT_ACCESS_TOKEN),
+  instantlyApiKey: b(process.env.INSTANTLY_API_KEY),
+  instantlyCampaignId: b(process.env.INSTANTLY_CAMPAIGN_ID),
 
   // Talent pool (Workable)
   workableApiKey: b(process.env.WORKABLE_API_KEY),
@@ -52,6 +54,7 @@ export const env = {
   hasOrigami: !!b(process.env.ORIGAMI_API_KEY),
   hasSlack: !!b(process.env.SLACK_BOT_TOKEN),
   hasHubspot: !!b(process.env.HUBSPOT_ACCESS_TOKEN),
+  hasInstantly: !!b(process.env.INSTANTLY_API_KEY),
   hasWorkable: !!b(process.env.WORKABLE_API_KEY),
 }
 

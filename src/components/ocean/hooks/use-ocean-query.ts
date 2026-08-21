@@ -846,3 +846,72 @@ export function useTestIntegration() {
     onError: (err: Error) => toast.error('Test failed', { description: err.message }),
   })
 }
+
+// ---- Agent 1: job persistence + outreach (Instantly) ----
+
+// Recheck a single job — is it still posted? Ages it across bands.
+export function useRecheckJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (jobId: string) =>
+      http<ScrapedJobDTO & { recheckNote?: string }>(`/api/scraped-jobs/${jobId}/recheck`, { method: 'POST' }),
+    onSuccess: (data) => {
+      toast.success('Recheck complete', { description: data.recheckNote ?? '' })
+      qc.invalidateQueries({ queryKey: ['pipeline'] })
+      qc.invalidateQueries({ queryKey: ['icp-jobs'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+    onError: (err: Error) => toast.error('Recheck failed', { description: err.message }),
+  })
+}
+
+// Batch recheck — ages all open jobs (the 24h → 1w → 1m → 3m tracking).
+export function useBatchRecheck() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (limit?: number) =>
+      http<{ checked: number; live: number; closed: number; unknown: number; bandChanges: string[] }>(
+        '/api/pipeline/recheck',
+        { method: 'POST', body: JSON.stringify({ limit: limit ?? 20 }) }
+      ),
+    onSuccess: (data) => {
+      toast.success('Batch recheck done', {
+        description: `${data.live} still open · ${data.closed} closed · ${data.unknown} unreachable`,
+      })
+      qc.invalidateQueries({ queryKey: ['pipeline'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+    onError: (err: Error) => toast.error('Batch recheck failed', { description: err.message }),
+  })
+}
+
+// Push the decision maker into an Instantly email sequence.
+export function useSendToInstantly() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ jobId, email, campaignId }: { jobId: string; email: string; campaignId?: string }) =>
+      http<{ ok: boolean; drafted?: boolean; message?: string }>(
+        `/api/scraped-jobs/${jobId}/send-to-instantly`,
+        { method: 'POST', body: JSON.stringify({ email, campaignId }) }
+      ),
+    onSuccess: (data) => {
+      if (data.drafted) {
+        toast.success('Instantly lead drafted', { description: data.message })
+      } else {
+        toast.success('Pushed to Instantly')
+      }
+      qc.invalidateQueries({ queryKey: ['pipeline'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+    onError: (err: Error) => toast.error('Instantly push failed', { description: err.message }),
+  })
+}
+
+// List Instantly campaigns (for the picker).
+export function useInstantlyCampaigns() {
+  return useQuery<{ campaigns: { id: string; name: string }[]; configured: boolean }>({
+    queryKey: ['instantly-campaigns'],
+    queryFn: () => http('/api/scraped-jobs/none/send-to-instantly'),
+    staleTime: 5 * 60_000,
+  })
+}

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import {
   Filter, Loader2, ExternalLink, Search, Mail, Send, CheckCircle2,
   FileText, ArrowRight, UserSearch, Sparkles, X, UsersRound, Link2,
+  RefreshCw, Flame, Zap, UserRound,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import {
   usePipeline, useFindDecisionMaker, useFindReferrers, useScrapedJobOutreach,
+  useRecheckJob, useSendToInstantly, useBatchRecheck,
   useConvertScrapedJob, useDismissScrapedJob, useUpdateScrapedJob,
 } from '../hooks/use-ocean-query'
 import { useOceanStore } from '../store'
@@ -35,6 +37,32 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={cn('inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium', step.color)}><Icon className="size-3" />{step.label}</span>
 }
 
+// Age-band badge: how long the job has stayed open (the persistence signal).
+function AgeBandBadge({ job }: { job: ScrapedJobDTO }) {
+  const meta: Record<string, { label: string; cls: string; title: string }> = {
+    fresh:   { label: 'New',  cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', title: 'Posted < 24h' },
+    week:    { label: '1w+',  cls: 'bg-sky-50 text-sky-700 border-sky-200', title: 'Still open after a week' },
+    month:   { label: '1m+',  cls: 'bg-amber-50 text-amber-700 border-amber-200', title: 'Still open after a month' },
+    quarter: { label: '3m+',  cls: 'bg-orange-50 text-orange-700 border-orange-200', title: 'Still open after 3 months' },
+    stuck:   { label: 'STUCK', cls: 'bg-rose-50 text-rose-700 border-rose-200 font-semibold', title: 'Open 3+ months — they cannot fill it' },
+  }
+  if (job.stillLive === false) {
+    return <Badge variant="outline" className="text-[10px] opacity-50 line-through" title="Posting no longer live">closed</Badge>
+  }
+  const m = meta[job.ageBand] ?? meta.fresh
+  return <Badge variant="outline" className={`text-[10px] ${m.cls}`} title={m.title}>{m.label}</Badge>
+}
+
+function LeadScoreBadge({ score }: { score: number }) {
+  if (!score) return null
+  const hot = score >= 50
+  return (
+    <Badge variant="outline" className={`text-[10px] tabular-nums ${hot ? 'bg-rose-50 text-rose-700 border-rose-200' : ''}`} title="Lead score">
+      {hot && <Flame className="size-2.5" />}{score}
+    </Badge>
+  )
+}
+
 function PipelineCard({ job, onOpen }: { job: ScrapedJobDTO & { icpName?: string }; onOpen: () => void }) {
   return (
     <Card className="cursor-pointer hover:border-primary/40 transition-colors" onClick={onOpen}>
@@ -47,10 +75,16 @@ function PipelineCard({ job, onOpen }: { job: ScrapedJobDTO & { icpName?: string
           <StatusBadge status={job.status} />
         </div>
         {job.salaryText && <div className="text-xs font-medium text-emerald-700">{job.salaryText}</div>}
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
+          <AgeBandBadge job={job} />
           <Badge variant="outline" className="text-[10px] capitalize">{job.sourcePlatform}</Badge>
-          {job.scrapeSource && <Badge variant="outline" className="text-[10px]">{job.scrapeSource}</Badge>}
-          <span>{relativeTime(job.createdAt)}</span>
+          <LeadScoreBadge score={job.leadScore ?? 0} />
+          {job.postedByName && (
+            <span className="inline-flex items-center gap-0.5" title={`Posted by ${job.postedByName}${job.postedByTitle ? ` (${job.postedByTitle})` : ''} — ${job.postedByKind ?? 'other'}`}>
+              <UserRound className="size-3" />{job.postedByName}
+            </span>
+          )}
+          <span>seen {job.timesSeen ?? 1}×</span>
           {job.dmTitle && <span className="flex items-center gap-1">· <UserSearch className="size-3" /> {job.dmTitle}</span>}
         </div>
       </CardContent>
@@ -62,6 +96,9 @@ function PipelineDetailSheet({ job, open, onOpenChange }: { job: (ScrapedJobDTO 
   const findDm = useFindDecisionMaker()
   const findReferrers = useFindReferrers()
   const outreach = useScrapedJobOutreach()
+  const recheck = useRecheckJob()
+  const instantly = useSendToInstantly()
+  const [instantlyEmail, setInstantlyEmail] = useState('')
   const convert = useConvertScrapedJob()
   const dismiss = useDismissScrapedJob()
   const update = useUpdateScrapedJob()
@@ -107,6 +144,40 @@ function PipelineDetailSheet({ job, open, onOpenChange }: { job: (ScrapedJobDTO 
             {job.salaryText && <div className="text-sm font-medium text-emerald-700">{job.salaryText}</div>}
             <p className="text-xs text-muted-foreground">{job.snippet}</p>
             {job.sourceUrl && <a href={job.sourceUrl} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="size-3" />View original posting</a>}
+          </div>
+
+          {/* Agent 1: persistence tracking — how long has this role stayed open? */}
+          <div className="rounded-lg border p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><RefreshCw className="size-3" />Job tracking</div>
+              <Button size="sm" variant="outline" className="h-7 text-xs" disabled={recheck.isPending || job.stillLive === false} onClick={() => recheck.mutate(job.id)}>
+                {recheck.isPending ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}Recheck
+              </Button>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <AgeBandBadge job={job} />
+              <LeadScoreBadge score={job.leadScore ?? 0} />
+              <span className="text-[11px] text-muted-foreground">
+                seen {job.timesSeen ?? 1}× · first {relativeTime(job.firstSeenAt ?? job.createdAt)} · last {relativeTime(job.lastSeenAt ?? job.createdAt)}
+              </span>
+            </div>
+            {job.postedByName ? (
+              <div className="text-xs">
+                <span className="text-muted-foreground">Posted by </span>
+                <span className="font-medium">{job.postedByName}</span>
+                {job.postedByTitle && <span className="text-muted-foreground"> ({job.postedByTitle})</span>}
+                {job.postedByKind && (job.postedByKind === 'founder' || job.postedByKind === 'ceo') && (
+                  <Badge variant="outline" className="ml-1.5 text-[9px] bg-rose-50 text-rose-700 border-rose-200">hot signal · {job.postedByKind}</Badge>
+                )}
+                {job.postedByUrl && (
+                  <a href={job.postedByUrl} target="_blank" rel="noopener noreferrer nofollow" className="ml-1.5 inline-flex items-center gap-0.5 text-[11px] text-primary hover:underline">
+                    <Link2 className="size-3" />LinkedIn
+                  </a>
+                )}
+              </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">Poster unknown — recheck detects who at the company posted this (HR / founder / CEO).</p>
+            )}
           </div>
 
           {/* Step 2: Decision maker */}
@@ -183,6 +254,14 @@ function PipelineDetailSheet({ job, open, onOpenChange }: { job: (ScrapedJobDTO 
               </div>
               {job.outreachContent && <div className="space-y-1"><Textarea value={job.outreachContent} readOnly className="text-xs font-mono h-32" />{job.outreachSentAt && <div className="text-[11px] text-muted-foreground">Sent {relativeTime(job.outreachSentAt)}</div>}</div>}
               {job.outreachStatus === 'none' && <p className="text-xs text-muted-foreground">Draft a personalised outreach email to the decision maker.</p>}
+              {/* Instantly: push this lead into a cold-email sequence */}
+              <div className="flex items-center gap-1.5 pt-1">
+                <input type="email" value={instantlyEmail} onChange={(e) => setInstantlyEmail(e.target.value)} placeholder={job.dmName ? `${job.dmName.split(' ')[0].toLowerCase()}@${job.company.toLowerCase().replace(/[^a-z0-9]/g, '')}.com` : 'dm email address'} className="flex-1 h-7 rounded-md border px-2 text-xs" />
+                <Button size="sm" variant="outline" className="h-7 text-xs" disabled={!instantlyEmail.trim() || instantly.isPending} onClick={() => instantly.mutate({ jobId: job.id, email: instantlyEmail.trim() })}>
+                  {instantly.isPending ? <Loader2 className="size-3 animate-spin" /> : <Zap className="size-3" />}Push to Instantly
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Instantly runs the email sequence ({{company}}/{{role}}/{{signal}} auto-personalized). No key set = lead drafted in-app.</p>
             </div>
           )}
 
@@ -230,6 +309,7 @@ function PipelineEmpty() {
 
 export function PipelineView() {
   const { data: pipeline, isLoading } = usePipeline()
+  const batchRecheck = useBatchRecheck()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const filtered = (pipeline ?? []).filter((j) => statusFilter === 'all' ? j.status !== 'dismissed' : j.status === statusFilter)
@@ -242,6 +322,9 @@ export function PipelineView() {
       <div>
         <h2 className="text-lg font-semibold flex items-center gap-2"><Filter className="size-5 text-primary" />Pipeline</h2>
         <p className="text-sm text-muted-foreground max-w-2xl">Every scraped job moves through 4 steps: find the decision maker → outreach → get the JD → match candidates. Click a job to advance it through the pipeline.</p>
+        <Button size="sm" variant="outline" className="mt-2 h-7 text-xs" disabled={batchRecheck.isPending} onClick={() => batchRecheck.mutate(20)}>
+          {batchRecheck.isPending ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}Recheck open jobs (age tracking)
+        </Button>
       </div>
       <div className="flex items-center gap-1 flex-wrap">
         <button onClick={() => setStatusFilter('all')} className={cn('rounded-md px-3 py-1 text-xs font-medium transition-colors', statusFilter === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground')}>All ({Object.values(counts).reduce((a, b) => a + b, 0)})</button>
