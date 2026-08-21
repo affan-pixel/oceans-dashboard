@@ -7,7 +7,6 @@ import {
   Crosshair,
   Users,
   Sparkles,
-  Settings,
   Waves,
   X,
   Filter,
@@ -32,7 +31,6 @@ const NAV: NavItem[] = [
   { id: 'candidates', label: 'Divers', icon: Users },
   { id: 'matches', label: 'Matches', icon: Sparkles },
   { id: 'integrations', label: 'Integrations', icon: Plug },
-  { id: 'define', label: 'Define', icon: Settings },
 ]
 
 function Logo() {

@@ -210,77 +210,6 @@ export interface ScrapedJobDTO {
   createdAt: string;
 }
 
-export interface BriefDTO {
-  id: string;
-  title: string;
-  content: string;               // freeform text
-  type: string;                  // note | jd_draft | role_description | context
-  linkedJdId: string | null;     // if converted into a JD
-  createdAt: string;
-  updatedAt: string;
-}
-
-// ---------- Agent 1: Customer Finder ----------
-
-export interface SignalDTO {
-  id: string;
-  leadId: string;
-  type: string;                // funding | job_post | headcount_growth | tech_stack | no_local_hire | warm_intro
-  title: string;
-  description: string;
-  source: string | null;
-  weight: number;
-  capturedAt: string;
-}
-
-export interface OutreachStepDTO {
-  id: string;
-  leadId: string;
-  step: number;
-  channel: string;             // email | linkedin | manual
-  action: string;
-  content: string | null;
-  status: string;              // pending | sent | replied | bounced
-  scheduledAt: string | null;
-  sentAt: string | null;
-  createdAt: string;
-}
-
-export interface LeadDTO {
-  id: string;
-  companyName: string;
-  domain: string | null;
-  website: string | null;
-  industry: string | null;
-  stage: string | null;
-  sizeMin: number | null;
-  sizeMax: number | null;
-  location: string | null;
-  region: string | null;
-  icpScore: number;
-  priority: string;            // high | medium | low
-  status: string;              // new | contacted | replied | qualified | won | lost
-  sourceStrategy: string | null;
-  mirroredFromClientId: string | null;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-  signals: SignalDTO[];
-  outreachSteps: OutreachStepDTO[];
-}
-
-export interface IcpConfigDTO {
-  id: string;
-  sizeMin: number;
-  sizeMax: number;
-  stages: string[];
-  locations: string[];
-  industries: string[];
-  hiringPattern: string;
-  budgetMinUsd: number;
-  pain: string;
-}
-
 export interface ActivityDTO {
   id: string;
   agent: string;               // customer_finder | talent_matcher | system
@@ -293,7 +222,7 @@ export interface ActivityDTO {
 // ---------- Integrations ----------
 
 export interface IntegrationDTO {
-  provider: string;            // apify | apollo | lemlist | hubspot | clay
+  provider: string;            // apify | clay | slack | hubspot | instantly
   label: string;
   description: string;
   docsUrl: string;
@@ -310,11 +239,11 @@ export interface IntegrationDTO {
 // ---------- Dashboard ----------
 
 export interface DashboardStatsDTO {
-  totalLeads: number;
-  highPriorityLeads: number;
+  totalLeads: number;            // scraped jobs not dismissed — a job IS a lead
+  hotLeads: number;              // still live and open 3+ months
   contactedLeads: number;
-  qualifiedLeads: number;
-  wonLeads: number;
+  repliedLeads: number;
+  convertedLeads: number;
   totalCandidates: number;
   activeCandidates: number;
   placedCandidates: number;
@@ -322,11 +251,10 @@ export interface DashboardStatsDTO {
   activeJds: number;             // JDs flagged isActive=true ("jobs I'm looking for")
   totalMatches: number;
   totalJobTargets: number;
-  totalBriefs: number;
   recentActivities: ActivityDTO[];
   leadsByRegion: { region: string; count: number }[];
   leadsByStatus: { status: string; count: number }[];
-  leadsByStrategy: { strategy: string; count: number }[];
+  leadsByAgeBand: { ageBand: string; count: number }[];
   // Latest scraped jobs — surfaced on the dashboard so scraped leads are visible
   // immediately (with posting link + decision maker + referrers), not just Pipeline.
   latestScrapedJobs: ScrapedJobDTO[];

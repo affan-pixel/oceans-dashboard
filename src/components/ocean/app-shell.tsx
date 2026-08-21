@@ -10,7 +10,6 @@ import { JdsView } from './views/jds-view'
 import { JobTargetsView } from './views/job-targets-view'
 import { CandidatesView } from './views/candidates-view'
 import { MatchesView } from './views/matches-view'
-import { DefineView } from './views/define-view'
 import { IntegrationsView } from './views/integrations-view'
 import { useOceanStore, type ViewId } from './store'
 
@@ -22,7 +21,6 @@ const VIEWS: Record<ViewId, React.ComponentType> = {
   candidates: CandidatesView,
   matches: MatchesView,
   integrations: IntegrationsView,
-  define: DefineView,
 }
 
 function ViewRouter() {

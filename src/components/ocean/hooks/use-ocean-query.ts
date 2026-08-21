@@ -6,13 +6,9 @@ import type {
   CandidateDTO,
   JobDescriptionDTO,
   MatchDTO,
-  LeadDTO,
-  IcpConfigDTO,
   DashboardStatsDTO,
   ActivityDTO,
-  OutreachStepDTO,
   JobTargetDTO,
-  BriefDTO,
   ScrapedJobDTO,
   IntegrationDTO,
 } from '@/lib/types'
@@ -573,79 +569,6 @@ export function usePipeline() {
   })
 }
 
-// ----- Briefs -----
-export function useBriefs() {
-  return useQuery<BriefDTO[]>({
-    queryKey: ['briefs'],
-    queryFn: () => http<BriefDTO[]>('/api/briefs'),
-  })
-}
-
-export interface BriefInput {
-  title: string
-  content: string
-  type?: string
-  linkedJdId?: string | null
-}
-
-export function useCreateBrief() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (body: BriefInput) =>
-      http<BriefDTO>('/api/briefs', { method: 'POST', body: JSON.stringify(body) }),
-    onSuccess: () => {
-      toast.success('Brief saved')
-      qc.invalidateQueries({ queryKey: ['briefs'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
-    onError: (err: Error) => toast.error('Failed to save brief', { description: err.message }),
-  })
-}
-
-export function useUpdateBrief() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Partial<BriefInput> }) =>
-      http<BriefDTO>(`/api/briefs/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-    onSuccess: () => {
-      toast.success('Brief updated')
-      qc.invalidateQueries({ queryKey: ['briefs'] })
-    },
-    onError: (err: Error) => toast.error('Failed to update brief', { description: err.message }),
-  })
-}
-
-export function useDeleteBrief() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: string) => http(`/api/briefs/${id}`, { method: 'DELETE' }),
-    onSuccess: () => {
-      toast.success('Brief deleted')
-      qc.invalidateQueries({ queryKey: ['briefs'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
-    onError: (err: Error) => toast.error('Failed to delete brief', { description: err.message }),
-  })
-}
-
-export function useConvertBriefToJd() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: { title?: string; company?: string } }) =>
-      http<{ jd: JobDescriptionDTO; brief: BriefDTO }>(`/api/briefs/${id}/convert-to-jd`, {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
-    onSuccess: (data) => {
-      toast.success('Converted to JD', { description: `Saved as ${data.jd.title} — view it in Job Descriptions.` })
-      qc.invalidateQueries({ queryKey: ['briefs'] })
-      qc.invalidateQueries({ queryKey: ['jds'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
-    onError: (err: Error) => toast.error('Failed to convert brief', { description: err.message }),
-  })
-}
-
 // ----- Matches -----
 export function useMatches() {
   return useQuery<MatchDTO[]>({
@@ -659,113 +582,6 @@ export function useMatch(id: string | null) {
     queryKey: ['match', id],
     queryFn: () => http<MatchDTO>(`/api/matches/${id}`),
     enabled: !!id,
-  })
-}
-
-// ----- Leads -----
-export function useLeads() {
-  return useQuery<LeadDTO[]>({
-    queryKey: ['leads'],
-    queryFn: () => http<LeadDTO[]>('/api/leads'),
-  })
-}
-
-export function useLead(id: string | null) {
-  return useQuery<LeadDTO>({
-    queryKey: ['lead', id],
-    queryFn: () => http<LeadDTO>(`/api/leads/${id}`),
-    enabled: !!id,
-  })
-}
-
-export function useCreateLead() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (body: Record<string, unknown>) =>
-      http<LeadDTO>('/api/leads', { method: 'POST', body: JSON.stringify(body) }),
-    onSuccess: (data) => {
-      toast.success('Lead added', { description: data.companyName })
-      qc.invalidateQueries({ queryKey: ['leads'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
-    onError: (err: Error) => toast.error('Failed to add lead', { description: err.message }),
-  })
-}
-
-export function useUpdateLead() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
-      http<LeadDTO>(`/api/leads/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-    onSuccess: (data) => {
-      toast.success('Lead updated')
-      qc.invalidateQueries({ queryKey: ['leads'] })
-      qc.invalidateQueries({ queryKey: ['lead', data.id] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
-    onError: (err: Error) => toast.error('Failed to update lead', { description: err.message }),
-  })
-}
-
-export function useDeleteLead() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: string) => http(`/api/leads/${id}`, { method: 'DELETE' }),
-    onSuccess: () => {
-      toast.success('Lead deleted')
-      qc.invalidateQueries({ queryKey: ['leads'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
-    onError: (err: Error) => toast.error('Failed to delete lead', { description: err.message }),
-  })
-}
-
-export function useCreateOutreach() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ leadId, body }: { leadId: string; body: { channel: string; action: string; role?: string } }) =>
-      http<OutreachStepDTO>(`/api/leads/${leadId}/outreach`, { method: 'POST', body: JSON.stringify(body) }),
-    onSuccess: (data) => {
-      toast.success('Outreach step drafted', { description: `Step ${data.step} via ${data.channel}.` })
-      qc.invalidateQueries({ queryKey: ['leads'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
-    onError: (err: Error) => toast.error('Failed to draft outreach', { description: err.message }),
-  })
-}
-
-export function useUpdateOutreach() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: { status: string; sentAt?: string | null } }) =>
-      http<OutreachStepDTO>(`/api/outreach/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-    onSuccess: () => {
-      toast.success('Outreach updated')
-      qc.invalidateQueries({ queryKey: ['leads'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
-    onError: (err: Error) => toast.error('Failed to update outreach', { description: err.message }),
-  })
-}
-
-// ----- ICP -----
-export function useIcp() {
-  return useQuery<IcpConfigDTO>({
-    queryKey: ['icp'],
-    queryFn: () => http<IcpConfigDTO>('/api/icp'),
-  })
-}
-
-export function useUpdateIcp() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (body: Partial<IcpConfigDTO>) =>
-      http<IcpConfigDTO>('/api/icp', { method: 'PUT', body: JSON.stringify(body) }),
-    onSuccess: () => {
-      toast.success('ICP saved')
-      qc.invalidateQueries({ queryKey: ['icp'] })
-    },
-    onError: (err: Error) => toast.error('Failed to save ICP', { description: err.message }),
   })
 }
 

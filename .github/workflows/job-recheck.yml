@@ -1,0 +1,57 @@
+# Daily Agent 1 persistence check.
+#
+# This is the scheduler for the aging model. Each run re-visits the least-
+# recently-checked live postings, advances lastSeenAt/timesSeen, and moves jobs
+# through the age bands (24h → 1w → 1m → 3m → STUCK). "STUCK" is the signal
+# Oceans actually sells against: they cannot fill this role themselves.
+#
+# Setup (one time):
+#   gh secret set APP_URL      --body "https://<your-railway-domain>"
+#   gh secret set CRON_SECRET  --body "<same value as the app's CRON_SECRET env var>"
+#
+# Batch size is capped at 40 per request, so this fans out across the day rather
+# than hammering the reader API in one burst. Raise the cron frequency (not the
+# limit) if the pipeline grows past ~250 live jobs.
+
+name: Job recheck
+
+on:
+  schedule:
+    # 06:00, 12:00 and 18:00 UTC daily — 3 × 40 = up to 120 postings/day.
+    - cron: '0 6,12,18 * * *'
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Postings to recheck this run (max 40)'
+        required: false
+        default: '40'
+
+jobs:
+  recheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Call the recheck endpoint
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          LIMIT: ${{ github.event.inputs.limit || '40' }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::APP_URL and CRON_SECRET repository secrets must both be set."
+            exit 1
+          fi
+
+          # --fail-with-body so a 401/503 surfaces the reason, not just an exit code.
+          body=$(curl --silent --show-error --fail-with-body \
+            --max-time 600 \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL%/}/api/cron/recheck?limit=${LIMIT}")
+
+          echo "$body"
+          echo "### Recheck result" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          echo "$body" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

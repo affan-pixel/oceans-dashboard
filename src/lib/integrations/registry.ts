@@ -7,7 +7,7 @@
 //   2. Register it in REGISTRY below
 //   3. (optional) wire it into a flow via getIntegration() + isConnected()
 
-export type Provider = 'apify' | 'apollo' | 'lemlist' | 'hubspot' | 'clay' | 'origami' | 'firecrawl' | 'slack' | 'workable' | 'instantly'
+export type Provider = 'apify' | 'clay' | 'slack' | 'hubspot' | 'instantly'
 
 export interface IntegrationConfig {
   provider: Provider
@@ -16,7 +16,7 @@ export interface IntegrationConfig {
   docsUrl: string
   keyLabel: string // e.g. "API Token"
   keyPlaceholder: string
-  category: 'scraping' | 'enrichment' | 'outreach' | 'crm' | 'leads' | 'messaging' | 'ats'
+  category: 'scraping' | 'enrichment' | 'crm' | 'messaging' | 'outreach'
   capabilities: string[] // e.g. ['job-scrape', 'lead-enrich']
 }
 
@@ -59,66 +59,6 @@ export const REGISTRY: Record<Provider, IntegrationAdapter> = {
         }
       } catch {
         return { ok: false, message: 'Could not reach Apify. Check the token and try again.' }
-      }
-    },
-  },
-
-  apollo: {
-    provider: 'apollo',
-    label: 'Apollo',
-    description:
-      'Company + people data — enriches leads with real industry, size, tech stack, and emails.',
-    docsUrl: 'https://developer.apollo.io/',
-    keyLabel: 'API Key',
-    keyPlaceholder: 'xxxxxxxxxxxxxxxxxxxxxxxx',
-    category: 'enrichment',
-    capabilities: ['lead-enrich'],
-    test: async (apiKey: string): Promise<TestResult> => {
-      try {
-        const res = await fetch('https://api.apollosecurity.com/v1/organization_jobs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
-          body: JSON.stringify({ api_key: apiKey, page: 1, per_page: 1 }),
-          signal: AbortSignal.timeout(10_000),
-        })
-        if (res.status === 401 || res.status === 403) {
-          return { ok: false, message: 'Apollo rejected the API key.' }
-        }
-        return { ok: true, message: 'Connected to Apollo.', accountInfo: 'Key accepted.' }
-      } catch {
-        return { ok: false, message: 'Could not reach Apollo. Check the key and try again.' }
-      }
-    },
-  },
-
-  lemlist: {
-    provider: 'lemlist',
-    label: 'Lemlist',
-    description:
-      'Outreach email sequences — sends real personalised campaigns instead of drafting in-app only.',
-    docsUrl: 'https://developer.lemlist.com/',
-    keyLabel: 'API Key',
-    keyPlaceholder: 'xxxxxxxxxxxxxxxx',
-    category: 'outreach',
-    capabilities: ['outreach-send'],
-    test: async (apiKey: string): Promise<TestResult> => {
-      try {
-        const auth = Buffer.from(`${apiKey}:`).toString('base64')
-        const res = await fetch('https://api.lemlist.com/api/team', {
-          headers: { Authorization: `Basic ${auth}` },
-          signal: AbortSignal.timeout(10_000),
-        })
-        if (!res.ok) {
-          return { ok: false, message: `Lemlist rejected the key (HTTP ${res.status}).` }
-        }
-        const data = (await res.json()) as { name?: string }
-        return {
-          ok: true,
-          message: 'Connected to Lemlist.',
-          accountInfo: data.name ? `Team: ${data.name}` : undefined,
-        }
-      } catch {
-        return { ok: false, message: 'Could not reach Lemlist. Check the key and try again.' }
       }
     },
   },
@@ -175,53 +115,6 @@ export const REGISTRY: Record<Provider, IntegrationAdapter> = {
     },
   },
 
-  origami: {
-    provider: 'origami',
-    label: 'Origami',
-    description:
-      'AI lead-finding + multi-step LinkedIn & email outreach (origami.chat). Finds high-intent leads from LinkedIn and sets up email sequences — can drive Agent 1 lead-finding + outreach.',
-    docsUrl: 'https://origami.chat',
-    keyLabel: 'API Key',
-    keyPlaceholder: 'xxxxxxxxxxxxxxxxxxxxxxxx',
-    category: 'leads',
-    capabilities: ['lead-find', 'outreach-setup'],
-    test: async (apiKey: string): Promise<TestResult> => {
-      // Origami's API surface isn't publicly documented yet; this test just
-      // confirms the key is non-empty and well-formed. Real validation happens
-      // on first use. Update the endpoint here once Origami publishes API docs.
-      if (!apiKey || apiKey.length < 10) {
-        return { ok: false, message: 'Origami key looks too short — check it and try again.' }
-      }
-      return { ok: true, message: 'Origami key saved (validated on first use).', accountInfo: 'Key accepted.' }
-    },
-  },
-
-  firecrawl: {
-    provider: 'firecrawl',
-    label: 'Firecrawl',
-    description:
-      'Web scraping — scrapes JD pages + LinkedIn profiles into clean markdown. Replaces simulated external-prospect scraping with real data when connected.',
-    docsUrl: 'https://docs.firecrawl.dev/',
-    keyLabel: 'API Key',
-    keyPlaceholder: 'fc-xxxxxxxxxxxxxxxxxxxxxxxx',
-    category: 'scraping',
-    capabilities: ['job-scrape', 'profile-scrape'],
-    test: async (apiKey: string): Promise<TestResult> => {
-      try {
-        const res = await fetch('https://api.firecrawl.dev/v1/account', {
-          headers: { Authorization: `Bearer ${apiKey}` },
-          signal: AbortSignal.timeout(10_000),
-        })
-        if (res.status === 401 || res.status === 403) {
-          return { ok: false, message: 'Firecrawl rejected the API key.' }
-        }
-        return { ok: true, message: 'Connected to Firecrawl.', accountInfo: 'Key accepted.' }
-      } catch {
-        return { ok: false, message: 'Could not reach Firecrawl. Check the key and try again.' }
-      }
-    },
-  },
-
   slack: {
     provider: 'slack',
     label: 'Slack',
@@ -246,25 +139,6 @@ export const REGISTRY: Record<Provider, IntegrationAdapter> = {
       } catch {
         return { ok: false, message: 'Could not reach Slack. Check the token and try again.' }
       }
-    },
-  },
-
-  workable: {
-    provider: 'workable',
-    label: 'Workable',
-    description:
-      'Talent pool ATS — pulls Lagoon + Port candidate profiles into the matching pool when connected.',
-    docsUrl: 'https://dev.workable.com/',
-    keyLabel: 'API Token',
-    keyPlaceholder: 'xxxxxxxxxxxxxxxxxxxxxxxx',
-    category: 'ats',
-    capabilities: ['candidate-fetch'],
-    test: async (apiKey: string): Promise<TestResult> => {
-      // Real validation needs the subdomain; the adapter does the full call.
-      if (!apiKey || apiKey.length < 8) {
-        return { ok: false, message: 'Workable token looks too short.' }
-      }
-      return { ok: true, message: 'Workable token saved (validated on first sync).' }
     },
   },
 
@@ -293,5 +167,5 @@ export const REGISTRY: Record<Provider, IntegrationAdapter> = {
 }
 
 export const ALL_PROVIDERS: Provider[] = [
-  'apify', 'origami', 'firecrawl', 'apollo', 'clay', 'workable', 'slack', 'lemlist', 'hubspot', 'instantly',
+  'apify', 'clay', 'slack', 'hubspot', 'instantly',
 ]
