@@ -5,19 +5,14 @@
 import type {
   ActivityDTO,
   ApprovalRequestDTO,
-  BriefDTO,
   CandidateDTO,
   ExternalProspectDTO,
-  IcpConfigDTO,
   JobDescriptionDTO,
   JobTargetDTO,
-  LeadDTO,
   MatchDTO,
   MatchResultDTO,
-  OutreachStepDTO,
   ReferrerDTO,
   ScrapedJobDTO,
-  SignalDTO,
 } from './types'
 
 // ---------------- helpers ----------------
@@ -272,26 +267,6 @@ export function toScrapedJobDTO(s: {
   }
 }
 
-export function toBriefDTO(b: {
-  id: string
-  title: string
-  content: string
-  type: string
-  linkedJdId: string | null
-  createdAt: Date
-  updatedAt: Date
-}): BriefDTO {
-  return {
-    id: b.id,
-    title: b.title,
-    content: b.content,
-    type: b.type,
-    linkedJdId: b.linkedJdId,
-    createdAt: b.createdAt.toISOString(),
-    updatedAt: b.updatedAt.toISOString(),
-  }
-}
-
 export function toMatchResultDTO(
   r: {
     id: string
@@ -423,128 +398,6 @@ export function toMatchDTO(
     createdAt: m.createdAt.toISOString(),
     results: m.results,
     externalProspects: m.externalProspects ?? [],
-  }
-}
-
-// ---------------- Agent 1: Customer Finder ----------------
-
-export function toSignalDTO(s: {
-  id: string
-  leadId: string
-  type: string
-  title: string
-  description: string
-  source: string | null
-  weight: number
-  capturedAt: Date
-}): SignalDTO {
-  return {
-    id: s.id,
-    leadId: s.leadId,
-    type: s.type,
-    title: s.title,
-    description: s.description,
-    source: s.source,
-    weight: s.weight,
-    capturedAt: s.capturedAt.toISOString(),
-  }
-}
-
-export function toOutreachDTO(o: {
-  id: string
-  leadId: string
-  step: number
-  channel: string
-  action: string
-  content: string | null
-  status: string
-  scheduledAt: Date | null
-  sentAt: Date | null
-  createdAt: Date
-}): OutreachStepDTO {
-  return {
-    id: o.id,
-    leadId: o.leadId,
-    step: o.step,
-    channel: o.channel,
-    action: o.action,
-    content: o.content,
-    status: o.status,
-    scheduledAt: o.scheduledAt ? o.scheduledAt.toISOString() : null,
-    sentAt: o.sentAt ? o.sentAt.toISOString() : null,
-    createdAt: o.createdAt.toISOString(),
-  }
-}
-
-export function toLeadDTO(l: {
-  id: string
-  companyName: string
-  domain: string | null
-  website: string | null
-  industry: string | null
-  stage: string | null
-  sizeMin: number | null
-  sizeMax: number | null
-  location: string | null
-  region: string | null
-  icpScore: number
-  priority: string
-  status: string
-  sourceStrategy: string | null
-  mirroredFromClientId: string | null
-  notes: string | null
-  createdAt: Date
-  updatedAt: Date
-  signals?: Array<Parameters<typeof toSignalDTO>[0]>
-  outreachSteps?: Array<Parameters<typeof toOutreachDTO>[0]>
-}): LeadDTO {
-  return {
-    id: l.id,
-    companyName: l.companyName,
-    domain: l.domain,
-    website: l.website,
-    industry: l.industry,
-    stage: l.stage,
-    sizeMin: l.sizeMin,
-    sizeMax: l.sizeMax,
-    location: l.location,
-    region: l.region,
-    icpScore: l.icpScore,
-    priority: l.priority,
-    status: l.status,
-    sourceStrategy: l.sourceStrategy,
-    mirroredFromClientId: l.mirroredFromClientId,
-    notes: l.notes,
-    createdAt: l.createdAt.toISOString(),
-    updatedAt: l.updatedAt.toISOString(),
-    signals: (l.signals ?? []).map(toSignalDTO),
-    outreachSteps: (l.outreachSteps ?? []).map(toOutreachDTO),
-  }
-}
-
-// ---------------- ICP + Activity ----------------
-
-export function toIcpDTO(i: {
-  id: string
-  sizeMin: number
-  sizeMax: number
-  stages: string
-  locations: string
-  industries: string
-  hiringPattern: string
-  budgetMinUsd: number
-  pain: string
-}): IcpConfigDTO {
-  return {
-    id: i.id,
-    sizeMin: i.sizeMin,
-    sizeMax: i.sizeMax,
-    stages: parseArray(i.stages),
-    locations: parseArray(i.locations),
-    industries: parseArray(i.industries),
-    hiringPattern: i.hiringPattern,
-    budgetMinUsd: i.budgetMinUsd,
-    pain: i.pain,
   }
 }
 

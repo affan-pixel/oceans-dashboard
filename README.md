@@ -1,78 +1,96 @@
 # Oceans — AI Headhunting Platform
 
-AI-powered headhunting platform placing Sri Lankan talent with companies in USA/Europe/Australia. Two AI agents: Customer Finder (job scraping + decision maker finding + outreach) and Talent Matcher (semantic candidate matching).
+Places Sri Lankan talent with companies in the USA / Europe / Australia. Two
+agents: **Customer Finder** (job scraping → decision maker → outreach) and
+**Talent Matcher** (semantic candidate matching → redacted profile → approval →
+prospect email).
 
 ## Quick Start
 
 ```bash
-# 1. Install dependencies
-bun install
+npm ci
+npm run db:push
+npm run db:generate
+npm run dev
+```
 
-# 2. Set up the database
-bun run db:push
-bun run db:generate
+Open http://localhost:3000. Seed demo data from the "Seed" button in the topbar,
+or `POST /api/seed` with `ENABLE_SEED_ENDPOINT=true`.
 
-# 3. Seed demo data (11 candidates, 6 ICPs, 6 leads)
-bun run src/lib/seed.ts
+Optional real-page scraping service:
 
-# 4. (Optional) Start the crawl4ai scraping service
+```bash
 pip install crawl4ai aiohttp
-cd mini-services/crawl4ai-service
-python3 index.py &
-
-# 5. Start the dev server
-bun run dev
+python3 mini-services/crawl4ai-service/index.py &
 ```
 
-Open http://localhost:3000
+## Environment
 
-## Environment Variables
+Copy `.env.example` to `.env`. Every API key is optional and each feature
+degrades gracefully without it — except two:
 
-Create a `.env` file:
+| Variable | Why it's required |
+|---|---|
+| `DATABASE_URL` | Postgres connection string |
+| `CRON_SECRET` | Authenticates the scheduled recheck. Without it the aging signal never advances (see below). |
+
+## The aging model — read this before deploying
+
+The core signal is **job persistence**: a remote role that stays posted for weeks
+is a company that cannot fill it, and that is the moment to call them. Every job
+carries `firstSeenAt`, `lastSeenAt`, `lastCheckedAt`, `timesSeen`, `ageBand`
+(`fresh → week → month → quarter → stuck`) and `stillLive`.
+
+Those fields only move if something re-visits each posting on a schedule.
+`.github/workflows/job-recheck.yml` does that — it calls
+`GET /api/cron/recheck` three times a day, 40 postings per run, least-recently-
+checked first.
+
+**Set these two repo secrets or the schedule is a no-op:**
+
+```bash
+gh secret set APP_URL     --body "https://<your-railway-domain>"
+gh secret set CRON_SECRET --body "<same value as the app's CRON_SECRET>"
 ```
-DATABASE_URL="file:./db/custom.db"
-# INTEGRATION_ENCRYPTION_KEY="change-this-in-production-32+chars"
-```
+
+Prefer Railway's own cron? Point a cron service at the same endpoint with the
+same bearer token — the endpoint is the contract, the scheduler is swappable.
 
 ## Tech Stack
 
-- **Framework**: Next.js 16 (App Router) + TypeScript 5
-- **Database**: Prisma 6 + SQLite (swap to Postgres for production)
-- **AI**: z-ai-web-dev-sdk (Claude-equivalent LLM)
-- **Scraping**: crawl4ai (Python, port 3031) + RemoteOK API + Jina Reader fallback
-- **UI**: Tailwind CSS 4 + shadcn/ui + Framer Motion + Recharts
-- **State**: TanStack Query + Zustand
+- **Framework** — Next.js 16 (App Router) + TypeScript 5
+- **Database** — Prisma 6 + Postgres
+- **AI** — `z-ai-web-dev-sdk` (`glm-4.6` by default, via `ZAI_MODEL`)
+- **Scraping** — crawl4ai (Python, port 3031) → RemoteOK API → Jina Reader → LLM fallback
+- **UI** — Tailwind CSS 4 + shadcn/ui + Framer Motion + Recharts
+- **State** — TanStack Query + Zustand
 
 ## Project Structure
 
 ```
 src/
-  app/api/          # 34 API route handlers
-  app/page.tsx       # Only user-visible route
-  lib/ai.ts          # 7 AI functions (parseJD, matchCandidates, findDecisionMaker...)
-  lib/integrations/  # 6 scraping sources + 5 app adapters
-  components/ocean/   # 7 views + shared components
-prisma/schema.prisma  # 13 models
-mini-services/crawl4ai-service/  # Python scraper
+  app/api/                 # API route handlers
+  app/api/cron/recheck/    # scheduled aging/persistence check (bearer auth)
+  lib/agent1.ts            # age bands + lead scoring
+  lib/recheck.ts           # recheck engine, shared by the UI button and the cron
+  lib/ai.ts                # parseJD, matchCandidates, findDecisionMaker, …
+  lib/integrations/        # apify, clay, slack, hubspot, instantly
+  components/ocean/views/  # dashboard, ICPs, pipeline, JDs, Divers, matches, integrations
+prisma/schema.prisma       # 10 models
+mini-services/crawl4ai-service/
 ```
 
-## The 5-Step Pipeline
+## The pipeline
 
-1. **Scrape** jobs per ICP (RemoteOK API → crawl4ai → Jina Reader → LLM fallback)
-2. **Find decision maker** (DuckDuckGo search → real name + LinkedIn URL)
-3. **Outreach** (AI-drafted personalised email)
-4. **Get JD** (convert scraped posting → structured JD)
-5. **Match** (semantic matching against Diver pool)
-
-## Deploying to Netlify
-
-Swap SQLite for Postgres (Neon recommended):
-1. Change `provider = "postgresql"` in prisma/schema.prisma
-2. Set `DATABASE_URL` to your Neon connection string
-3. `bun run db:push` against the new DB
-4. Deploy
-
-See `download/oceans-tech-architecture.pdf` for full documentation.
+1. **Scrape** jobs per role ICP (RemoteOK → crawl4ai → Jina Reader → LLM fallback)
+2. **Categorize** — role, seniority, skills, timezone
+3. **Find decision maker** — real name + LinkedIn URL
+4. **Score** — age band, poster type, DM found (see `lib/agent1.ts`)
+5. **Match** against the Diver pool (Port = available now, Lagoon = in pool)
+6. **Redacted profile** — Oceans-branded, PII stripped
+7. **Slack** — opportunity + profile + match type + price band
+8. **Leadership approval** — `ApprovalRequest`, in-app or via Slack button
+9. **Prospect email** — HubSpot single-send, or Instantly for sequenced volume
 
 ## Built for
 

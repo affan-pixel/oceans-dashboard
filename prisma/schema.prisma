@@ -175,6 +175,9 @@ model ScrapedJob {
   // A job seen repeatedly over weeks/months = company can't fill it = hot lead.
   firstSeenAt DateTime @default(now()) // when we first scraped it
   lastSeenAt  DateTime @default(now()) // last scrape/recheck that confirmed it live
+  lastCheckedAt DateTime?               // last recheck ATTEMPT, success or not — drives round-robin
+                                        // ordering so the batch job walks the whole table instead of
+                                        // re-scanning the same oldest rows every run.
   timesSeen   Int      @default(1)     // how many scrapes/rechecks confirmed it
   ageBand     String   @default("fresh") // fresh(<24h) | week | month | quarter | stuck(3mo+)
   stillLive   Boolean  @default(true)  // false once a recheck finds the posting gone
@@ -191,17 +194,6 @@ model ScrapedJob {
   leadSignals String @default("[]") // JSON array of { signal, points } that produced the score
 
   createdAt    DateTime @default(now())
-}
-
-// Freeform input / scratchpad — "a place where we can give input"
-model Brief {
-  id           String   @id @default(cuid())
-  title        String
-  content      String   // freeform text
-  type         String   @default("note") // note | jd_draft | role_description | context
-  linkedJdId   String?  // if this brief was converted into a JD
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
 }
 
 model Match {
@@ -267,80 +259,6 @@ model ApprovalRequest {
   decidedAt     DateTime?
   note          String?
   createdAt     DateTime @default(now())
-}
-
-// ---------- Agent 1: Customer Finder ----------
-
-model Lead {
-  id           String   @id @default(cuid())
-  companyName  String
-  domain       String?
-  website      String?
-  industry     String?
-  stage        String?  // Series A / B / C / Bootstrapped
-  sizeMin      Int?     // employee range
-  sizeMax      Int?
-  location     String?  // HQ city/country
-  region       String?  // USA | Europe | Australia
-
-  // ICP scoring
-  icpScore     Int      @default(0)  // 0-100
-  priority     String   @default("medium") // high | medium | low
-  status       String   @default("new") // new | contacted | replied | qualified | won | lost
-
-  // Origin strategy
-  sourceStrategy String? // mirror | signal | warm_intro | icp_track
-  mirroredFromClientId String? // if mirrored from existing client
-
-  notes        String?
-
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  signals      Signal[]
-  outreachSteps OutreachStep[]
-}
-
-model Signal {
-  id           String   @id @default(cuid())
-  leadId       String
-  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
-  type         String   // funding | job_post | headcount_growth | tech_stack | no_local_hire | warm_intro
-  title        String
-  description  String
-  source       String?  // Crunchbase | LinkedIn | Indeed | Clay | BuiltWith
-  weight       Int      @default(5) // contribution to icpScore
-  capturedAt   DateTime @default(now())
-}
-
-model OutreachStep {
-  id           String   @id @default(cuid())
-  leadId       String
-  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
-  step         Int      // 1-based sequence step
-  channel      String   // email | linkedin | manual
-  action       String   // e.g. "Personalised email #1", "LinkedIn connect"
-  content      String?  // drafted message
-  status       String   @default("pending") // pending | sent | replied | bounced
-  scheduledAt  DateTime?
-  sentAt       DateTime?
-  createdAt    DateTime @default(now())
-}
-
-model IcpConfig {
-  id           String   @id @default("singleton")
-  // JSON strings for multi-value attributes (seeded via application layer)
-  sizeMin      Int      @default(15)
-  sizeMax      Int      @default(200)
-  stages       String   @default("[]")
-  locations    String   @default("[]")
-  industries   String   @default("[]")
-  hiringPattern String  @default("remote-first or remote-open")
-  budgetMinUsd Int      @default(80000)
-  pain         String   @default("Cannot fill technical or GTM roles locally at the price they want")
-  updatedAt    DateTime @updatedAt
 }
 
 model Activity {

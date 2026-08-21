@@ -4,19 +4,6 @@
 
 import { db } from './db'
 
-const STAGES_DEFAULT = JSON.stringify(['Series A', 'Series B', 'Series C', 'Bootstrapped'])
-const LOCATIONS_DEFAULT = JSON.stringify([
-  'San Francisco',
-  'New York',
-  'Austin',
-  'London',
-  'Berlin',
-  'Amsterdam',
-  'Sydney',
-  'Melbourne',
-])
-const INDUSTRIES_DEFAULT = JSON.stringify(['SaaS', 'Fintech', 'Edtech', 'Ecommerce', 'Dev Tools'])
-
 interface SeedCandidate {
   name: string
   headline: string
@@ -153,167 +140,6 @@ const CANDIDATES: SeedCandidate[] = [
   },
 ]
 
-interface SeedLead {
-  companyName: string
-  domain: string
-  website: string
-  industry: string
-  stage: string
-  sizeMin: number
-  sizeMax: number
-  location: string
-  region: 'USA' | 'Europe' | 'Australia'
-  icpScore: number
-  priority: 'high' | 'medium' | 'low'
-  status: 'new' | 'contacted' | 'replied' | 'qualified' | 'won' | 'lost'
-  sourceStrategy: 'mirror' | 'signal' | 'warm_intro' | 'icp_track'
-  notes: string
-  signals: Array<{ type: string; title: string; description: string; source: string; weight: number }>
-  outreach: Array<{ step: number; channel: string; action: string; content: string | null; status: string }>
-}
-
-const LEADS: SeedLead[] = [
-  {
-    companyName: 'Northwind Labs',
-    domain: 'northwindlabs.io',
-    website: 'https://northwindlabs.io',
-    industry: 'SaaS',
-    stage: 'Series A',
-    sizeMin: 35,
-    sizeMax: 60,
-    location: 'San Francisco',
-    region: 'USA',
-    icpScore: 92,
-    priority: 'high',
-    status: 'contacted',
-    sourceStrategy: 'mirror',
-    notes: 'Mirrored from existing client Cohere Tools. Same dev-tools segment, similar headcount.',
-    signals: [
-      { type: 'funding', title: '$12M Series A closed', description: 'Led by Index Ventures. Headcount expected to grow 30% over next 2 quarters.', source: 'Crunchbase', weight: 25 },
-      { type: 'job_post', title: 'Hiring GTM Engineer (remote)', description: 'Posted on Indeed and Wellfound 6 days ago. Salary $95k-$120k.', source: 'Indeed MCP', weight: 20 },
-      { type: 'tech_stack', title: 'Uses Apollo + Clay + HubSpot', description: 'BuiltWith confirms Apollo, Clay, HubSpot — matches Sri Lankan GTM talent stack.', source: 'BuiltWith', weight: 15 },
-    ],
-    outreach: [
-      { step: 1, channel: 'email', action: 'Personalised email #1', content: 'Hi — saw Northwind just closed the Series A and you are hiring a GTM Engineer. Ocean Talent places Sri Lankan GTM operators at remote-first dev-tools companies... 15 min next week?', status: 'sent' },
-      { step: 2, channel: 'linkedin', action: 'LinkedIn connection + note', content: null, status: 'pending' },
-    ],
-  },
-  {
-    companyName: 'Bright Harbor',
-    domain: 'brightharbor.co',
-    website: 'https://brightharbor.co',
-    industry: 'Fintech',
-    stage: 'Series B',
-    sizeMin: 80,
-    sizeMax: 140,
-    location: 'London',
-    region: 'Europe',
-    icpScore: 87,
-    priority: 'high',
-    status: 'replied',
-    sourceStrategy: 'signal',
-    notes: 'Strong fit. Open to intro call next Tuesday.',
-    signals: [
-      { type: 'funding', title: '£18M Series B', description: 'Closed 3 weeks ago. Scaling eng + GTM teams.', source: 'Crunchbase', weight: 22 },
-      { type: 'headcount_growth', title: '+22% headcount in 90 days', description: 'Clay enrichment detected 19 new hires in last quarter, mostly eng + revops.', source: 'Clay', weight: 18 },
-      { type: 'no_local_hire', title: 'Senior FE role open 58 days', description: 'Senior Frontend Engineer role unfilled for 58 days on their careers page.', source: 'Job board monitoring', weight: 16 },
-    ],
-    outreach: [
-      { step: 1, channel: 'email', action: 'Personalised email #1', content: 'Hi — saw Bright Harbor scaled 22% this quarter and the Senior FE role is still open after 8 weeks. We have placed 3 senior FE engineers at UK fintechs this year...', status: 'replied' },
-      { step: 2, channel: 'email', action: 'Follow-up with candidate preview', content: 'Sharing a preview of a candidate who shipped a checkout redesign that lifted conversion 18%. Full profile on request.', status: 'sent' },
-    ],
-  },
-  {
-    companyName: 'Kettle & Co',
-    domain: 'kettleco.com.au',
-    website: 'https://kettleco.com.au',
-    industry: 'Ecommerce',
-    stage: 'Bootstrapped',
-    sizeMin: 20,
-    sizeMax: 40,
-    location: 'Sydney',
-    region: 'Australia',
-    icpScore: 78,
-    priority: 'medium',
-    status: 'new',
-    sourceStrategy: 'warm_intro',
-    notes: 'Warm intro path via existing client (Bright Harbor CFO knows their CEO).',
-    signals: [
-      { type: 'job_post', title: 'Hiring Product Designer (remote, AU/global)', description: 'Posted 4 days ago on Wellfound. Salary AUD $110k-$140k.', source: 'Wellfound', weight: 18 },
-      { type: 'warm_intro', title: 'Shared connection: 2 mutual LinkedIn 1st-degree', description: 'Bright Harbor CFO and Kettle CEO are 1st-degree connections. Intro request drafted.', source: 'LinkedIn Sales Nav', weight: 20 },
-    ],
-    outreach: [
-      { step: 1, channel: 'manual', action: 'Request warm intro from Bright Harbor CFO', content: null, status: 'pending' },
-    ],
-  },
-  {
-    companyName: 'Meridian Flow',
-    domain: 'meridianflow.io',
-    website: 'https://meridianflow.io',
-    industry: 'Dev Tools',
-    stage: 'Series A',
-    sizeMin: 15,
-    sizeMax: 30,
-    location: 'Berlin',
-    region: 'Europe',
-    icpScore: 84,
-    priority: 'high',
-    status: 'qualified',
-    sourceStrategy: 'icp_track',
-    notes: 'ICP match on all 7 attributes. Active GTM + design hiring.',
-    signals: [
-      { type: 'funding', title: '€8M Series A', description: 'Announced last month. Hiring plan shared on LinkedIn.', source: 'LinkedIn News', weight: 20 },
-      { type: 'job_post', title: '2 open roles matching ICP', description: 'GTM Engineer + Product Designer, both remote, posted last 10 days.', source: 'Indeed MCP', weight: 22 },
-      { type: 'tech_stack', title: 'Stack match: React, Next.js, Clay', description: 'BuiltWith + GitHub confirms stack overlap with placed candidates.', source: 'BuiltWith', weight: 14 },
-    ],
-    outreach: [
-      { step: 1, channel: 'email', action: 'Personalised email #1', content: 'Hi — congrats on the Series A. Saw the GTM + Design roles. We have placed 4 operators at dev-tools startups in EU this year...', status: 'replied' },
-      { step: 2, channel: 'email', action: 'Candidate preview sent', content: 'Shared 2 candidate previews. Awaiting call slot.', status: 'sent' },
-    ],
-  },
-  {
-    companyName: 'Saltgrass',
-    domain: 'saltgrass.app',
-    website: 'https://saltgrass.app',
-    industry: 'Edtech',
-    stage: 'Series B',
-    sizeMin: 60,
-    sizeMax: 120,
-    location: 'Austin',
-    region: 'USA',
-    icpScore: 73,
-    priority: 'medium',
-    status: 'new',
-    sourceStrategy: 'signal',
-    notes: 'RevOps hire open 41 days. Local market tight.',
-    signals: [
-      { type: 'no_local_hire', title: 'RevOps Manager open 41 days', description: 'Role unfilled on careers page for 41 days. Local Austin market tight for RevOps.', source: 'Job board monitoring', weight: 18 },
-      { type: 'headcount_growth', title: '+18% headcount in 6 months', description: 'Clay enrichment detected scaling pattern.', source: 'Clay', weight: 14 },
-    ],
-    outreach: [],
-  },
-  {
-    companyName: 'Field Notes Co',
-    domain: 'fieldnotes.co',
-    website: 'https://fieldnotes.co',
-    industry: 'SaaS',
-    stage: 'Series C',
-    sizeMin: 150,
-    sizeMax: 200,
-    location: 'Amsterdam',
-    region: 'Europe',
-    icpScore: 69,
-    priority: 'low',
-    status: 'new',
-    sourceStrategy: 'icp_track',
-    notes: 'On watchlist. No active hiring yet but ICP fit is strong.',
-    signals: [
-      { type: 'headcount_growth', title: '+12% headcount in 90 days', description: 'Clay detected steady growth, no relevant open roles yet.', source: 'Clay', weight: 10 },
-    ],
-    outreach: [],
-  },
-]
-
 function j(v: unknown): string {
   return JSON.stringify(v)
 }
@@ -328,30 +154,9 @@ export async function seedData(prisma: typeof db) {
   await prisma.match.deleteMany()
   await prisma.jobDescription.deleteMany()
   await prisma.candidate.deleteMany()
-  await prisma.outreachStep.deleteMany()
-  await prisma.signal.deleteMany()
-  await prisma.lead.deleteMany()
   await prisma.jobTarget.deleteMany()
-  await prisma.brief.deleteMany()
-  await prisma.icpConfig.deleteMany()
   await prisma.integration.deleteMany()
   await prisma.activity.deleteMany()
-
-  // ICP singleton
-  await prisma.icpConfig.create({
-    data: {
-      id: 'singleton',
-      sizeMin: 15,
-      sizeMax: 200,
-      stages: STAGES_DEFAULT,
-      locations: LOCATIONS_DEFAULT,
-      industries: INDUSTRIES_DEFAULT,
-      hiringPattern: 'remote-first or remote-open',
-      budgetMinUsd: 80000,
-      pain: "Cannot fill technical or GTM roles locally at the price they want",
-    },
-  })
-  console.log('  ICP config seeded')
 
   // Candidates (structured fields left empty here — structured via AI when added through the UI;
   // for the seed we provide a pre-structured blob so matching works out of the box)
@@ -392,47 +197,6 @@ export async function seedData(prisma: typeof db) {
     })
   }
   console.log(`  ${CANDIDATES.length} candidates seeded`)
-
-  // Leads
-  for (const l of LEADS) {
-    await prisma.lead.create({
-      data: {
-        companyName: l.companyName,
-        domain: l.domain,
-        website: l.website,
-        industry: l.industry,
-        stage: l.stage,
-        sizeMin: l.sizeMin,
-        sizeMax: l.sizeMax,
-        location: l.location,
-        region: l.region,
-        icpScore: l.icpScore,
-        priority: l.priority,
-        status: l.status,
-        sourceStrategy: l.sourceStrategy,
-        notes: l.notes,
-        signals: {
-          create: l.signals.map((s) => ({
-            type: s.type,
-            title: s.title,
-            description: s.description,
-            source: s.source,
-            weight: s.weight,
-          })),
-        },
-        outreachSteps: {
-          create: l.outreach.map((o) => ({
-            step: o.step,
-            channel: o.channel,
-            action: o.action,
-            content: o.content,
-            status: o.status,
-          })),
-        },
-      },
-    })
-  }
-  console.log(`  ${LEADS.length} leads seeded (with signals + outreach)`)
 
   // ---------- Role-side ICPs — Oceans' 6 role categories ----------
   // Each ICP drives its own job scraping on LinkedIn / Indeed / Wellfound.
@@ -555,44 +319,12 @@ export async function seedData(prisma: typeof db) {
   })
   console.log('  1 active JD seeded (GTM Engineer @ Northwind Labs)')
 
-  // ---------- Briefs (freeform input) ----------
-  const BRIEFS = [
-    {
-      title: 'Client call notes — Bright Harbor',
-      content: 'Spoke with their VP Eng. They need a Senior Frontend Engineer who has shipped a checkout redesign. Budget £90-110k. Tight timeline — role open 8 weeks already. Send 3 candidates by Wed. Mention the conversion-lift case study from Rashmi.',
-      type: 'context',
-    },
-    {
-      title: 'JD draft — Founding Designer at Meridian Flow',
-      content: 'Meridian Flow (Berlin, Series A dev-tools) wants their first design hire. Own brand + marketing site + in-app onboarding. Scrappy, zero-to-one. €85-100k. Need someone who has rebuilt a marketing site before. Figma, DX sensibility. Convert this to a JD and run a match.',
-      type: 'jd_draft',
-    },
-    {
-      title: 'General note on Sri Lankan talent pool',
-      content: 'Strong cluster of GTM/growth operators in Colombo with Apollo + Clay + HubSpot experience. 3 candidates (Kavindu, Tharindu, Dinusha) all placed or placeable at remote-first Series A. Designer pool is thinner — Rashmi is the strongest lead.',
-      type: 'note',
-    },
-  ]
-  for (const b of BRIEFS) {
-    await prisma.brief.create({
-      data: {
-        title: b.title,
-        content: b.content,
-        type: b.type,
-      },
-    })
-  }
-  console.log(`  ${BRIEFS.length} briefs seeded`)
-
   // Activity log
   const activities = [
-    { agent: 'customer_finder', type: 'lead_created', message: 'New high-priority lead: Northwind Labs (mirror strategy).' },
-    { agent: 'customer_finder', type: 'signal_captured', message: 'Signal: Bright Harbor +22% headcount in 90 days.' },
-    { agent: 'customer_finder', type: 'signal_captured', message: 'Signal: Meridian Flow posted GTM Engineer role.' },
-    { agent: 'customer_finder', type: 'outreach_sent', message: 'Outreach step 1 sent to Northwind Labs.' },
-    { agent: 'customer_finder', type: 'outreach_sent', message: 'Follow-up with candidate preview sent to Bright Harbor.' },
+    { agent: 'customer_finder', type: 'jobs_scraped', message: 'Scraped 6 role ICPs — new postings added to the pipeline.' },
+    { agent: 'customer_finder', type: 'dm_found', message: 'Decision maker found for GTM Engineer @ Northwind Labs.' },
+    { agent: 'customer_finder', type: 'outreach_sent', message: 'Outreach drafted and sent for GTM Engineer @ Northwind Labs.' },
     { agent: 'talent_matcher', type: 'jd_parsed', message: 'JD parsed: GTM Engineer at Northwind Labs.' },
-    { agent: 'system', type: 'icp_updated', message: 'ICP config refreshed (size 15-200, 5 industries, 8 locations).' },
   ]
   for (const a of activities) {
     await prisma.activity.create({ data: a })

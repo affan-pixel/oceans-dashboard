@@ -10,7 +10,6 @@ export type ViewId =
   | 'candidates'
   | 'matches'
   | 'integrations'
-  | 'define'
 
 export type RegionFilter = 'all' | 'USA' | 'Europe' | 'Australia'
 
@@ -63,10 +62,6 @@ export const VIEW_TITLES: Record<ViewId, { title: string; subtitle: string }> = 
   },
   integrations: {
     title: 'Integrations',
-    subtitle: 'Connect Apify, Origami, Slack, HubSpot, Workable and more. Each key lights up its feature.',
-  },
-  define: {
-    title: 'Define',
-    subtitle: 'Configure the rules both agents follow.',
+    subtitle: 'Connect Apify, Clay, Slack, HubSpot and Instantly. Each key lights up its feature.',
   },
 }

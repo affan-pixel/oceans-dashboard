@@ -6,7 +6,7 @@ import {
   Sparkles,
   FileText,
   Crosshair,
-  PenLine,
+  Flame,
   BrainCircuit,
   TrendingUp,
   CheckCircle2,
@@ -383,10 +383,10 @@ export function DashboardView() {
           accent="oklch(0.70 0.10 200)"
         />
         <StatCard
-          icon={PenLine}
-          value={stats.totalBriefs}
-          label="Briefs"
-          accent="oklch(0.80 0.05 110)"
+          icon={Flame}
+          value={stats.hotLeads}
+          label="Open 3m+ (can't fill)"
+          accent="oklch(0.62 0.20 25)"
         />
       </div>
 

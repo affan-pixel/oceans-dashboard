@@ -25,10 +25,6 @@ export const env = {
 
   // Scraping
   apifyApiKey: b(process.env.APIFY_API_KEY),
-  firecrawlApiKey: b(process.env.FIRECRAWL_API_KEY),
-
-  // AI lead-finding + outreach (origami.chat)
-  origamiApiKey: b(process.env.ORIGAMI_API_KEY),
 
   // Notifications + approvals
   slackBotToken: b(process.env.SLACK_BOT_TOKEN),
@@ -40,9 +36,8 @@ export const env = {
   instantlyApiKey: b(process.env.INSTANTLY_API_KEY),
   instantlyCampaignId: b(process.env.INSTANTLY_CAMPAIGN_ID),
 
-  // Talent pool (Workable)
-  workableApiKey: b(process.env.WORKABLE_API_KEY),
-  workableSubdomain: b(process.env.WORKABLE_SUBDOMAIN),
+  // Cron auth — the scheduled recheck endpoint requires this as a bearer token.
+  cronSecret: b(process.env.CRON_SECRET),
 
   // Seed gate
   enableSeedEndpoint: process.env.ENABLE_SEED_ENDPOINT === 'true',
@@ -50,12 +45,9 @@ export const env = {
   // Derived: which integrations are available via ENV (vs needing the Integrations UI)
   hasLlm: !!b(process.env.ZAI_API_KEY),
   hasApify: !!b(process.env.APIFY_API_KEY),
-  hasFirecrawl: !!b(process.env.FIRECRAWL_API_KEY),
-  hasOrigami: !!b(process.env.ORIGAMI_API_KEY),
   hasSlack: !!b(process.env.SLACK_BOT_TOKEN),
   hasHubspot: !!b(process.env.HUBSPOT_ACCESS_TOKEN),
   hasInstantly: !!b(process.env.INSTANTLY_API_KEY),
-  hasWorkable: !!b(process.env.WORKABLE_API_KEY),
 }
 
 // True when NODE_ENV=production — used to harden endpoints.
